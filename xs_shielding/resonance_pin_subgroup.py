@@ -585,15 +585,6 @@ def test_pinsolver():
 
     # Test 1
     time0 = clock()
-    xs_tot = [0.02887092, 1.35346599]
-    xs_sca = [0.01154837, 0.]
-    source = [0.05097604, 1.26152386]
-    p.set_pin_xs(xs_tot=xs_tot, xs_sca=xs_sca, source=source)
-    p.solve()
-    print clock() - time0
-
-    # Test 2
-    time0 = clock()
     xs_tot = [1.53097167e+03, 1.35399647e+00]
     xs_sca = [612.38866698, 0.]
     source = [2.13863960e-05, 4.27554870e-04]
@@ -601,7 +592,7 @@ def test_pinsolver():
     p.solve()
     print clock() - time0
 
-    # Test 3. Time is longer than test 1
+    # Test 2
     time0 = clock()
     xs_tot = [0.02887092, 1.35346599]
     xs_sca = [0.01154837, 0.]
@@ -610,7 +601,7 @@ def test_pinsolver():
     p.solve()
     print clock() - time0
 
-    # Test 4. Time is longer than test 2
+    # Test 3. Time is longer than test 1
     time0 = clock()
     xs_tot = [1.53097167e+03, 1.35399647e+00]
     xs_sca = [612.38866698, 0.]
