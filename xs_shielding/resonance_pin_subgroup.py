@@ -578,6 +578,7 @@ def test_subgroup():
 
 
 def test_pinsolver():
+    # Test a simple pin problem
     p = PinFixSolver()
     p.pin_type = PINCELLBOX
     p.radii = [0.4095]
@@ -590,7 +591,8 @@ def test_pinsolver():
     source = [2.13863960e-05, 4.27554870e-04]
     p.set_pin_xs(xs_tot=xs_tot, xs_sca=xs_sca, source=source)
     p.solve()
-    print clock() - time0
+    print('time for test 1:')
+    print(clock() - time0)
 
     # Test 2
     time0 = clock()
@@ -599,7 +601,8 @@ def test_pinsolver():
     source = [0.05097604, 1.26152386]
     p.set_pin_xs(xs_tot=xs_tot, xs_sca=xs_sca, source=source)
     p.solve()
-    print clock() - time0
+    print('time for test 2:')
+    print(clock() - time0)
 
     # Test 3. Time is longer than test 1
     time0 = clock()
@@ -608,7 +611,9 @@ def test_pinsolver():
     source = [2.13863960e-05, 4.27554870e-04]
     p.set_pin_xs(xs_tot=xs_tot, xs_sca=xs_sca, source=source)
     p.solve()
-    print clock() - time0
+    print('time for 2nd run of test 1:')
+    print(clock() - time0)
+    print('why longer than 1st run of test 1')
 
 if __name__ == '__main__':
     # test_subgroup()
