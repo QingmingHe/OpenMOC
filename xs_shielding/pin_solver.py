@@ -150,6 +150,7 @@ class PinFixSolver(object):
 
         # Set up solver
         self._moc_solver = openmoc.CPUSolver(track)
+        self._moc_solver.useExponentialIntrinsic()
         self._moc_solver.setNumThreads(self._moc_opts.num_omp_threads)
         self._moc_solver.setConvergenceThreshold(self._moc_opts.tolerance)
 
