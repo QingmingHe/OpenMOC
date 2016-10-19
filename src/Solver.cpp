@@ -814,6 +814,71 @@ void Solver::computeFlux(int max_iters, solverMode mode,
   _timer->recordSplit("Total time");
 }
 
+/**
+ * Solve equation:
+ * L \phi + \Sigma_t \phi = \Sigma_s \phi + Q
+ * The difference from computeFlux is that this one iterate on scattering source
+ */
+void Solver::iterateScattSource(int max_iters, solverMode mode) {
+
+  if (_track_generator == NULL)
+    log_printf(ERROR, "The Solver is unable to compute the flux "
+               "since it does not contain a TrackGenerator");
+
+  log_printf(NORMAL, "Computing the flux...");
+
+  /* Clear all timing data from a previous simulation run */
+  clearTimerSplits();
+
+  /* Start the timer to record the total time to converge the flux */
+  _timer->startTimer();
+
+  /* Initialize keff to 1 for FSR source calculations */
+  _k_eff = 1.;
+
+  _num_iterations = 0;
+  FP_PRECISION residual = 0.;
+
+  /* Initialize data structures */
+  initializeFSRs();
+  initializeMaterials(mode);
+  countFissionableFSRs();
+  initializeExpEvaluator();
+
+  /* Initialize new flux arrays */
+  initializeFluxArrays();
+  flattenFSRFluxes(0.0);
+  storeFSRFluxes();
+
+  initializeSourceArrays();
+  zeroTrackFluxes();
+
+  /* Source iteration loop */
+  for (int i=0; i < max_iters; i++) {
+
+    computeFSRSources();
+    transportSweep();
+    addSourceToScalarFlux();
+    residual = computeResidual(SCALAR_FLUX);
+    storeFSRFluxes();
+    _num_iterations++;
+
+    log_printf(NORMAL, "Iteration %d:\tres = %1.3E", i, residual);
+
+    /* Check for convergence */
+    if (i > 1 && residual < _converge_thresh)
+      break;
+  }
+
+  if (_num_iterations == max_iters-1)
+    log_printf(WARNING, "Unable to converge the flux");
+
+  resetMaterials(mode);
+
+  _timer->stopTimer();
+  _timer->recordSplit("Total time");
+}
+
 
 /**
  * @brief Computes the total source distribution by performing a series of

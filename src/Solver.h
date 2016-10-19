@@ -304,6 +304,7 @@ public:
 
   void computeFlux(int max_iters=1000, solverMode mode=FORWARD,
                    bool only_fixed_source=true);
+  void iterateScattSource(int max_iters=1000, solverMode mode=FORWARD);
   void computeSource(int max_iters=1000, solverMode mode=FORWARD,
                      double k_eff=1.0, residualType res_type=TOTAL_SOURCE);
   void computeEigenvalue(int max_iters=1000, solverMode mode=FORWARD,
