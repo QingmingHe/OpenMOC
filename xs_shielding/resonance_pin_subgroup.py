@@ -6,6 +6,7 @@ from openmoc.process import get_scalar_fluxes
 from math import ceil
 from library_micro import LibraryMicro
 from time import clock
+import h5py
 
 PINCELLBOX = 1
 PINCELLCYL = 2
@@ -88,8 +89,10 @@ class ResonancePinSubgroup(object):
         self._resnuc_xs = None
         self._n_res_reg = None
 
+    def _solve_adjust_sub_wgt(self):
+        pass
+
     def _solve_onenuc_onetemp(self):
-        n_res = self._micro_lib.last_res - self._micro_lib.first_res
         n_region = len(self._pin_cell.mat_fill)
         mac_tot = np.zeros(n_region)
         mac_sca = np.zeros(n_region)
@@ -105,20 +108,14 @@ class ResonancePinSubgroup(object):
                     res_mat = mat
                     break
 
-        # Initialize self-shielded xs
+        # Initialize self-shielded xs. Xs for last region is pin averaged
+        # self-shielded xs
         self._resnuc_xs = {}
         self._resnuc_xs[res_nuc] = {}
-        self._resnuc_xs[res_nuc]['xs_abs'] \
-            = np.zeros((n_res, self._n_res_reg))
-        self._resnuc_xs[res_nuc]['xs_sca'] \
-            = np.zeros((n_res, self._n_res_reg))
-        if self._micro_lib.has_resfis(res_nuc):
-            self._resnuc_xs[res_nuc]['xs_nfi'] \
-                = np.zeros((n_res, self._n_res_reg))
+        self._init_self_shielded_xs()
 
         # for ig in range(22, 24):
         for ig in range(self._micro_lib.first_res, self._micro_lib.last_res):
-            jg = ig - self._micro_lib.first_res
             # Get subgroup parameters
             subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature, ig)
 
@@ -159,41 +156,114 @@ class ResonancePinSubgroup(object):
                                     subp['sub_wgt'][ib] *\
                                     xs_typ['lambda'] * xs_typ['potential']
 
-                    # Solve subgroup fixed source equation
+                    # Solve subgroup fixed source equation and get volume
+                    # integrated flux
                     self._pin_solver.set_pin_xs(xs_tot=mac_tot, xs_sca=mac_sca,
                                                 source=mac_src)
                     self._pin_solver.solve()
-                    sub_flux[ib, :] = self._pin_solver.flux[:]
+                    sub_flux[ib, :] = self._pin_solver.flux
 
                 # Condense self-shielded xs
-                for ireg in range(self._n_res_reg):
-                    flux = np.sum(sub_flux[:, ireg])
-                    self._resnuc_xs[res_nuc]['xs_abs'][jg, ireg] \
-                        = np.sum(subp['sub_abs'] * sub_flux[:, ireg]) / flux
-                    self._resnuc_xs[res_nuc]['xs_sca'][jg, ireg] \
-                        = np.sum(subp['sub_sca'] * sub_flux[:, ireg]) / flux
-                    if 'xs_nfi' in self._resnuc_xs[res_nuc]:
-                        self._resnuc_xs[res_nuc]['xs_nfi'][jg, ireg] \
-                            = np.sum(subp['sub_nfi'] * sub_flux[:, ireg]) \
-                            / flux
+                self._condense_self_shielded_xs(ig, subp, res_nuc, sub_flux,
+                                                self._pin_solver.vols)
 
-            else:
-                # Get xs at typical dilution for resonant nuclide
-                for ireg in range(self._n_res_reg):
-                    imat = self._pin_cell.mat_fill[ireg]
-                    mat = self._pin_cell.materials[imat]
+    def _init_self_shielded_xs(self):
+        # Initialize (pin averaged) self_shielded xs at typical dilution
+        n_res = self._micro_lib.last_res - self._micro_lib.first_res
+        for nuc in self._resnuc_xs:
+            self._resnuc_xs[nuc]['xs_abs'] \
+                = np.zeros((n_res, self._n_res_reg+1))
+            self._resnuc_xs[nuc]['xs_sca'] \
+                = np.zeros((n_res, self._n_res_reg+1))
+            if self._micro_lib.has_resfis(nuc):
+                self._resnuc_xs[nuc]['xs_nfi'] \
+                    = np.zeros((n_res, self._n_res_reg+1))
+            for ireg in range(self._n_res_reg):
+                imat = self._pin_cell.mat_fill[ireg]
+                mat = self._pin_cell.materials[imat]
+                for ig in range(self._micro_lib.first_res,
+                                self._micro_lib.last_res):
+                    jg = ig - self._micro_lib.first_res
                     xs_typ = self._micro_lib.get_typical_xs(
-                        res_nuc, mat.temperature, ig, 'scatter', 'absorb',
+                        nuc, mat.temperature, ig, 'scatter', 'absorb',
                         'nufis')
-                    self._resnuc_xs[res_nuc]['xs_abs'][jg, ireg] \
+                    self._resnuc_xs[nuc]['xs_abs'][jg, ireg] \
                         = xs_typ['absorb']
-                    self._resnuc_xs[res_nuc]['xs_sca'][jg, ireg] \
+                    self._resnuc_xs[nuc]['xs_sca'][jg, ireg] \
                         = xs_typ['scatter']
-                    if 'xs_nfi' in self._resnuc_xs[res_nuc]:
-                        self._resnuc_xs[res_nuc]['xs_nfi'][jg, ireg] \
+                    if 'xs_nfi' in self._resnuc_xs[nuc]:
+                        self._resnuc_xs[nuc]['xs_nfi'][jg, ireg] \
                             = xs_typ['nufis']
+            for ig in range(self._micro_lib.first_res,
+                            self._micro_lib.last_res):
+                jg = ig - self._micro_lib.first_res
+                self._resnuc_xs[nuc]['xs_abs'][jg, self._n_res_reg] \
+                    = self._resnuc_xs[nuc]['xs_abs'][jg, 0]
+                self._resnuc_xs[nuc]['xs_sca'][jg, self._n_res_reg] \
+                    = self._resnuc_xs[nuc]['xs_sca'][jg, 0]
+                if 'xs_nfi' in self._resnuc_xs[nuc]:
+                    self._resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg] \
+                        = self._resnuc_xs[nuc]['xs_nfi'][jg, 0]
 
-            print jg, self._resnuc_xs[res_nuc]['xs_abs'][jg, ireg]
+    def _condense_self_shielded_xs(self, ig, subp, nuc, sub_flux, vols):
+        jg = ig - self._micro_lib.first_res
+        n = self._n_res_reg
+        n_band = sub_flux.shape[0]
+        for ib in range(n_band):
+            sub_flux[ib, :] *= vols[:]
+        flux = np.sum(sub_flux, 0)
+        sum_flux = np.sum(flux[0:n])
+
+        # Condense subgroup xs to self-shielded xs
+        for ireg in range(n):
+            self._resnuc_xs[nuc]['xs_abs'][jg, ireg] \
+                = np.sum(subp['sub_abs'] * sub_flux[:, ireg]) \
+                / flux[ireg]
+            self._resnuc_xs[nuc]['xs_sca'][jg, ireg] \
+                = np.sum(subp['sub_sca'] * sub_flux[:, ireg]) \
+                / flux[ireg]
+            if 'xs_nfi' in self._resnuc_xs[nuc]:
+                self._resnuc_xs[nuc]['xs_nfi'][jg, ireg] \
+                    = np.sum(subp['sub_nfi'] * sub_flux[:, ireg]) \
+                    / flux[ireg]
+
+        # Condense spatial dependent self-shielded xs to pin averaged
+        # self-shielded xs
+        xs = self._resnuc_xs[nuc]['xs_abs']
+        xs[jg, n] = np.sum(xs[jg, 0:n] * flux[0:n]) / sum_flux
+        xs = self._resnuc_xs[nuc]['xs_sca']
+        xs[jg, n] = np.sum(xs[jg, 0:n] * flux[0:n]) / sum_flux
+        if 'xs_nfi' in self._resnuc_xs[nuc]:
+            xs = self._resnuc_xs[nuc]['xs_nfi']
+            xs[jg, n] = np.sum(xs[jg, 0:n] * flux[0:n]) / sum_flux
+
+    def print_self_shielded_xs(self, to_screen=True, to_h5=None):
+        n_res = self._micro_lib.last_res - self._micro_lib.first_res
+        n = self._n_res_reg
+        if to_screen:
+            for nuc in self._resnuc_xs:
+                print('nuclide', nuc)
+                for ireg in range(n):
+                    print('region', ireg)
+                    for ig in range(n_res):
+                        print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, ireg])
+                print('pin averaged')
+                for ig in range(n_res):
+                    print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, n])
+
+        if to_h5 is not None:
+            f = h5py.File(to_h5, 'w')
+            for nuc in self._resnuc_xs:
+                f.create_group(nuc)
+                for ireg in range(self._n_res_reg):
+                    reg = 'region%i' % ireg
+                    f[nuc].create_group(reg)
+                    f[nuc][reg]['xs_abs'] \
+                        = self._resnuc_xs[nuc]['xs_abs'][:, ireg]
+                f[nuc].create_group('average')
+                f[nuc]['average']['xs_abs'] \
+                    = self._resnuc_xs[nuc]['xs_abs'][:, self._n_res_reg]
+            f.close()
 
     def solve(self):
         # Set pin geometry
@@ -268,6 +338,7 @@ class PinFixSolver(object):
 
         # Volume averaged material region flux
         self._flux = None
+        self._vols = None
 
         # Moc solver
         self._moc_opts = _openmoc_opts
@@ -349,7 +420,7 @@ class PinFixSolver(object):
         top.setBoundaryType(openmoc.REFLECTIVE)
         bottom.setBoundaryType(openmoc.REFLECTIVE)
 
-        # Creating empty materials
+        # Creating empty materials for each fuel ring and moderator region
         self._moc_materials = []
         for i in range(n_radii+1):
             self._moc_materials.append(openmoc.Material(id=i+1))
@@ -411,16 +482,19 @@ class PinFixSolver(object):
         self._moc_solver.iterateScattSource()
         fsr_fluxes = get_scalar_fluxes(self._moc_solver)
 
+        # Get the volumes
+        self._vols = np.zeros(len(self._radii)+1)
+        for ifsr in range(n_fsr):
+            imat = self._moc_fsr2mat[ifsr]
+            self._vols[imat] += self._moc_solver.getFSRVolume(ifsr)
+
         # Compute the material averaged fluxes
         self._flux[:] = 0.0
-        n_mat = len(self._moc_materials)
-        vols = np.zeros(n_mat)
         for ifsr in range(n_fsr):
             imat = self._moc_fsr2mat[ifsr]
             vol = self._moc_solver.getFSRVolume(ifsr)
-            vols[imat] += vol
             self._flux[imat] += fsr_fluxes[ifsr, 0] * vol
-        self._flux[:] /= vols[:]
+        self._flux[:] /= self._vols[:]
 
     def solve(self):
         if self._pin_type == PINCELLBOX:
@@ -540,6 +614,14 @@ class PinFixSolver(object):
     def n_sector_mod(self, n_sector_mod):
         self._n_sector_mod = n_sector_mod
 
+    @property
+    def vols(self):
+        return self._vols
+
+    @vols.setter
+    def vols(self, vols):
+        self._vols = vols
+
 
 def test_pinsolver():
     # Test a simple pin problem
@@ -596,15 +678,27 @@ def test_subgroup():
     # Define a pin cell
     pin = PinCell()
     pin.pin_type = PINCELLBOX
-    pin.radii = [0.4095]
     pin.pitch = 1.26
     pin.materials = [fuel, mod]
-    pin.mat_fill = [0, 1]
+    pin.radii = [
+        0.129653384067,
+        0.183357574155,
+        0.224566248577,
+        0.259306768134,
+        0.289913780286,
+        0.317584634389,
+        0.343030610879,
+        0.36671514831,
+        0.388960152201,
+        0.41
+    ]
+    pin.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
     sub.pin_solver = PinFixSolver()
     sub.micro_lib = lib
     sub.solve()
+    sub.print_self_shielded_xs(to_h5='simple-pin.h5', to_screen=False)
 
 if __name__ == '__main__':
     test_subgroup()

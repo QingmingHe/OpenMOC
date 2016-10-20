@@ -2,13 +2,72 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from math import sqrt
+from copy import deepcopy
 
 _NO_RESONANCE = 0.998
-_N_BAND_BEGIN = 2
-_N_BAND_END = 7
 
 
-def unify_sub_wgt(pts):
+def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
+    # Fit probability table at average temperature
+    pto = ProbTable()
+    pto.gc_factor = rx_ave['lambda']
+    pto.potential = rx_ave['potential']
+    pto.dilutions = rx_ave['dilutions']
+    pto.xs_abs = rx_ave['res_abs']
+    pto.xs_sca = rx_ave['res_sca']
+    pto.xs_nfi = rx_ave['res_nfi']
+    pto.fit()
+
+    # Get the min number of band
+    n_band = 100
+    for pt in pts:
+        if pt['n_band'] < n_band:
+            n_band = pt['n_band']
+    if pto.n_band < n_band:
+        n_band = pt.n_band
+
+    # Refit the probability tables
+    pt_ave = None
+    for i in range(len(rxs)+1):
+        if i < len(rxs):
+            rx = rxs[i]
+        else:
+            rx = rx_ave
+        pto = ProbTable()
+        pto.gc_factor = rx['lambda']
+        pto.potential = rx['potential']
+        pto.dilutions = rx['dilutions']
+        pto.xs_abs = rx['res_abs']
+        pto.xs_sca = rx['res_sca']
+        pto.xs_nfi = rx['res_nfi']
+        pto.fit(n_band, n_band+1)
+        # Obtain the new probability tables
+        if i < len(rxs):
+            pt = pts[i]
+        else:
+            pt_ave = deepcopy(pts[0])
+            pt = pt_ave
+        pt['n_band'] = pto.n_band
+        pt['sub_tot'] = pto.sub_tot
+        pt['sub_abs'] = pto.sub_abs
+        pt['sub_sca'] = pto.sub_sca
+        pt['sub_wgt'] = pto.sub_wgt
+        if has_resfis:
+            pt['sub_nfi'] = pto.sub_nfi
+
+    # Adjust the subgroup weights by preserving the absorption resonance
+    # integral at infinite dilution
+    for pt in pts:
+        r = pt['sub_wgt'] / pt_ave['sub_wgt']
+        pt['sub_wgt'] = pt_ave['sub_wgt']
+        pt['sub_tot'] *= r
+        pt['sub_sca'] *= r
+        pt['sub_abs'] *= r
+        if has_resfis:
+            pt['sub_nfi'] *= r
+
+
+def unify_sub_wgt(pts, has_resfis=False):
     # Calculate unified accumulated weights
     wgts_acc = []
     unif_acc = []
@@ -42,7 +101,7 @@ def unify_sub_wgt(pts):
                 sub_tot[ib1] = pt['sub_tot'][ib0]
                 sub_abs[ib1] = pt['sub_abs'][ib0]
                 sub_sca[ib1] = pt['sub_sca'][ib0]
-                if 'sub_nfi' in pt:
+                if has_resfis:
                     sub_nfi[ib1] = pt['sub_nfi'][ib0]
                 if wgts_acc[i][ib0] < unif_acc[ib1]:
                     ib0 += 1
@@ -58,7 +117,7 @@ def unify_sub_wgt(pts):
             pt['sub_abs'] = sub_abs
             pt['sub_sca'] = sub_sca
             pt['sub_wgt'] = unif_wgt
-            if 'sub_nfi' in pt:
+            if has_resfis:
                 pt['sub_nfi'] = sub_nfi
 
 
@@ -83,7 +142,7 @@ class ProbTable(object):
         self._sub_nfi = None
         self._sub_wgt = None
 
-    def fit(self):
+    def fit(self, n_band_begin=2, n_band_end=7):
         # Calculate total xs from absorb and scatter
         self._xs_tot = self._xs_sca + self._xs_abs
 
@@ -102,7 +161,7 @@ class ProbTable(object):
         # Fit subgroup parameters from 2 bands to 6 bands
         min_rms = np.Infinity
         min_rms_n_band = 0
-        for n_band in range(_N_BAND_BEGIN, _N_BAND_END):
+        for n_band in range(n_band_begin, n_band_end):
             # Get background cross sections for fit
             idx0, idx1, idx2, backgrounds0, backgrounds1, backgrounds2 \
                 = _get_backgrounds(n_band, self._gc_factor, self._potential,

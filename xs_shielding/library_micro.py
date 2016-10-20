@@ -47,6 +47,7 @@ class NuclideMicro(object):
     def temp_interp_res_tbl(self, temp, ig):
         jg = ig - self._first_res
         if self._has_res:
+            # Interpolate resonance xs table
             temps = self._res_temps
             n_temp = len(temps)
             itemp1 = bisect(temps, temp)
@@ -67,8 +68,22 @@ class NuclideMicro(object):
                     + (1.0 - r) * self._res_nfi[itemp1][jg, :]
             else:
                 res_nfi = None
+            # Interpolate potential xs
+            temps = self._full_xs_temps
+            n_temp = len(temps)
+            itemp1 = bisect(temps, temp)
+            if itemp1 == 0:
+                itemp1 = 1
+            elif itemp1 == n_temp:
+                itemp1 = n_temp - 1
+            itemp0 = itemp1 - 1
+            r = (sqrt(temps[itemp1]) - sqrt(temp)) \
+                / (sqrt(temps[itemp1]) - sqrt(temps[itemp0]))
+            potential = r * self._potential[itemp0][jg] \
+                + (1.0 - r) * self._potential[itemp1][jg]
             return {'res_tot': res_tot, 'res_abs': res_abs, 'res_sca': res_sca,
-                    'res_nfi': res_nfi}
+                    'res_nfi': res_nfi, 'dilutions': self._dilutions,
+                    'lambda': self._gc_factor[jg], 'potential': potential}
         else:
             raise Exception('no resonance for %s' % (self._nuclide))
 
@@ -135,6 +150,13 @@ class NuclideMicro(object):
                 self._xs_nfi[itemp] = f[temp_group]['nu_fission'].value
                 self._chi[itemp] = f[temp_group]['chi'].value
 
+        # Very special case for potential, which is scattering xs at full xs
+        # temperatures at typical dilution
+        self._potential = {}
+        for itemp in range(len(self._full_xs_temps)):
+            self._potential[itemp] \
+                = self._xs_sca_tot[itemp][self._first_res:self._last_res]
+
         # Load resonance data
         res_group = nuc_group + '/resonance'
         n_res = self._last_res - self._first_res
@@ -152,7 +174,7 @@ class NuclideMicro(object):
             self._gc_factor = f[res_group]['lambda'].value
         else:
             self._gc_factor = np.zeros(n_res) + self._average_lambda
-        self._potential = self._xs_sca_tot[0][self._first_res:self._last_res]
+        # Read self-shielded xs
         if self._has_res:
             self._res_abs = {}
             self._res_sca = {}
@@ -160,6 +182,7 @@ class NuclideMicro(object):
                 self._res_nfi = {}
             self._res_temps = f[res_group]['temperatures'].value
             self._dilutions = f[res_group]['dilutions'].value
+            n_temp = len(self._res_temps)
             for itemp in range(n_temp):
                 temp_group = res_group + '/temp%s' % (itemp)
                 self._res_abs[itemp] = f[temp_group]['absorption'].value
@@ -253,26 +276,22 @@ class LibraryMicro(object):
             if 'lambda' in args:
                 xs['lambda'] = nuc._gc_factor[jg]
             if 'potential' in args:
-                xs['potential'] = nuc._potential[jg]
+                xs['potential'] = r * nuc._potential[itemp0][jg] \
+                    + (1.0 - r) * nuc._potential[itemp1][jg]
 
         return xs
 
     def get_subp(self, nuclide, temp, ig):
         nuc = self._nuclides[nuclide]
-        jg = ig - nuc._first_res
 
         # Temperature interpolate resonance xs table
         res_xs = nuc.temp_interp_res_tbl(temp, ig)
-        # print res_xs
-        # print nuc._gc_factor[jg]
-        # print nuc._potential[jg]
-        # print nuc._dilutions
 
         # Fit subgroup parameters
         pt = ProbTable()
-        pt.gc_factor = nuc._gc_factor[jg]
-        pt.potential = nuc._potential[jg]
-        pt.dilutions = nuc._dilutions
+        pt.gc_factor = res_xs['lambda']
+        pt.potential = res_xs['potential']
+        pt.dilutions = res_xs['dilutions']
         pt.xs_abs = res_xs['res_abs']
         pt.xs_sca = res_xs['res_sca']
         pt.xs_nfi = res_xs['res_nfi']
