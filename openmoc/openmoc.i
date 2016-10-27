@@ -34,6 +34,7 @@
   #include "../src/Vector.h"
   #include "../src/Matrix.h"
   #include "../src/linalg.h"
+  #include "../src/SDSolver.h"
 
   #ifdef ICPC
   #include "../src/VectorizedSolver.h"
@@ -130,6 +131,7 @@ namespace std {
 %include ../src/Vector.h
 %include ../src/Matrix.h
 %include ../src/linalg.h
+%include ../src/SDSolver.h
 
 #ifdef ICPC
 %include ../src/VectorizedSolver.h

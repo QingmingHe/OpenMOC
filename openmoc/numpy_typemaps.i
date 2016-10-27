@@ -19,6 +19,10 @@
  * using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* xs, int num_groups)}
 
+%apply (double* IN_ARRAY1, int DIM1) {(double* e_broad, int n_bnd)}
+%apply (double* IN_ARRAY1, int DIM1) {(double* xs, int nfg)}
+%apply (double* IN_ARRAY1, int DIM1) {(double* num_dens, int n_case)}
+
 /* The typemap used to match the method signature for the Cell rotation
  * angle setter method. This allows users to set the rotation angles
  * using NumPy arrays */

@@ -114,11 +114,11 @@ class ResonancePinSubgroup(object):
         self._resnuc_xs[res_nuc] = {}
         self._init_self_shielded_xs()
 
-        # for ig in range(22, 24):
         for ig in range(self._micro_lib.first_res, self._micro_lib.last_res):
             # Get subgroup parameters
             subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature, ig)
 
+            print ig, subp['n_band']
             if subp['n_band'] > 1:
                 sub_flux = np.zeros((subp['n_band'], n_region))
                 for ib in range(subp['n_band']):
@@ -672,7 +672,7 @@ def test_subgroup():
     import os
     fname = os.path.join(os.getenv('HOME'),
                          'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e.h5')
+                         'jeff-3.2-wims69e-25m.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)
     # Define a pin cell

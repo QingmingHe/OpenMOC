@@ -120,7 +120,8 @@ class configuration:
                     'src/Vector.cpp',
                     'src/Matrix.cpp',
                     'src/Cmfd.cpp',
-                    'src/linalg.cpp']
+                    'src/linalg.cpp',
+                    'src/SDSolver.cpp']
 
   sources['clang'] = ['openmoc/openmoc_wrap.cpp',
                       'src/Cell.cpp',
@@ -144,7 +145,8 @@ class configuration:
                       'src/Cmfd.cpp',
                       'src/Vector.cpp',
                       'src/Matrix.cpp',
-                      'src/linalg.cpp']
+                      'src/linalg.cpp',
+                      'src/SDSolver.cpp']
 
 
   sources['icpc'] = ['openmoc/openmoc_wrap.cpp',
@@ -170,7 +172,8 @@ class configuration:
                      'src/Cmfd.cpp',
                      'src/Vector.cpp',
                      'src/Matrix.cpp',
-                     'src/linalg.cpp']
+                     'src/linalg.cpp',
+                     'src/SDSolver.cpp']
 
 
   sources['bgxlc'] = ['openmoc/openmoc_wrap.cpp',
@@ -195,7 +198,8 @@ class configuration:
                       'src/Cmfd.cpp',
                       'src/Vector.cpp',
                       'src/Matrix.cpp',
-                      'src/linalg.cpp']
+                      'src/linalg.cpp',
+                      'src/SDSolver.cpp']
 
 
   sources['nvcc'] = ['openmoc/cuda/openmoc_cuda_wrap.cpp',
