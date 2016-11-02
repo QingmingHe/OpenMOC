@@ -29,6 +29,11 @@
  * hyper-fine cross sections using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* xs, int nfg)}
 
+/* The typemap used to match the method signature for the SDLibrary
+ * continuous-energy cross sections setter methods. This allows users to set the
+ * continuous-energy cross sections using NumPy arrays */
+%apply (double* IN_ARRAY1, int DIM1) {(double* ace_xs, int n)}
+
 /* The typemap used to match the method signature for the SDNuclide
  * number densities setter methods. This allows users to set the
  * number densities using NumPy arrays */

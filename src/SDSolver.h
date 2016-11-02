@@ -10,6 +10,46 @@
 #include <cmath>
 #endif
 
+class SDLibrary {
+private:
+  /** Number of energy point */
+  int _n;
+
+  /** Whether has fission */
+  bool _has_fis;
+
+  /** Energy points */
+  double* _energy;
+
+  /** Ace or hyper-fine energy group total cross sections */
+  double* _xs_tot;
+
+  /** Ace or hyper-fine energy group scattering cross sections */
+  double* _xs_sca;
+
+  /** Ace or hyper-fine energy group fission cross sections */
+  double* _xs_fis;
+public:
+  SDLibrary();
+  ~SDLibrary();
+  void setEnergy(double* ace_xs, int n);
+  void setXsTotal(double* ace_xs, int n);
+  void setXsScatter(double* ace_xs, int n);
+  void setXsFission(double* ace_xs, int n);
+  double* getEnergy();
+  double* getXsTotal();
+  double* getXsScatter();
+  double* getXsFission();
+};
+
+SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
+                        bool has_res_fis);
+
+SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
+                                   double temp0, double temp1, double temp,
+                                   double emax, double emin, int n,
+                                   bool has_res_fis);
+
 class SDNuclide {
 
 private:
@@ -76,6 +116,9 @@ private:
   /** Multi-group fission cross sections */
   double** _mg_fis;
 
+  /** Hyper-fine energy group library */
+  SDLibrary* _hf_lib;
+
 public:
   SDNuclide(const char* name="");
   virtual ~SDNuclide();
@@ -84,6 +127,7 @@ public:
   void setHFTotal(double* xs, int nfg);
   void setHFScatter(double* xs, int nfg);
   void setHFFissiion(double* xs, int nfg);
+  void setHFLibrary(SDLibrary* lib);
   void setAwr(double awr);
   void setPotential(double potential);
   void setNumDens(double* num_dens, int n_case);
