@@ -18,6 +18,12 @@ private:
   /** Whether has fission */
   bool _has_fis;
 
+  /** Potential cross sections of broad energy groups */
+  double _potential;
+
+  /** Atomic weight ratio */
+  double _awr;
+
   /** Energy points */
   double* _energy;
 
@@ -36,10 +42,15 @@ public:
   void setXsTotal(double* ace_xs, int n);
   void setXsScatter(double* ace_xs, int n);
   void setXsFission(double* ace_xs, int n);
+  void setPotential(double potential);
+  void setAwr(double awr);
   double* getEnergy();
   double* getXsTotal();
   double* getXsScatter();
   double* getXsFission();
+  double getPotential();
+  double getAwr();
+  int getNPoint();
 };
 
 SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,

@@ -139,18 +139,12 @@ class LibraryPseudo(object):
 
         # Initialize resonant nuclides of slowing down solver
         for inuc, nuclide in enumerate(self._nuclides):
-            cenuc = self._celib.get_nuclide(nuclide, self._temperature, emax,
+            hflib = self._celib.get_nuclide(nuclide, self._temperature, emax,
                                             emin, self._has_res_fis)
             sdnuc = sd.getNuclide(inuc)
             sdnuc.setName(nuclide)
-            sdnuc.setHFTotal(cenuc['xs_tot'])
-            sdnuc.setHFScatter(cenuc['xs_ela'])
-            if self._has_res_fis:
-                sdnuc.setHFFissiion(cenuc['xs_fis'])
-            sdnuc.setAwr(cenuc['awr'])
-            sdnuc.setPotential(cenuc['potential'])
+            sdnuc.setHFLibrary(hflib)
             sdnuc.setNumDens(np.zeros(self._n_dilution) + self._ratios[inuc])
-            del cenuc
 
         # Initialize background nuclide of slowing down solver
         sdnuc = sd.getNuclide(self._n_nuclide)

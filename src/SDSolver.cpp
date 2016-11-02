@@ -4,6 +4,8 @@
 SDLibrary::SDLibrary() {
   _n = 0;
   _has_fis = false;
+  _potential = 0.0;
+  _awr = 0.0;
   _energy = NULL;
   _xs_tot = NULL;
   _xs_sca = NULL;
@@ -79,6 +81,31 @@ void SDLibrary::setXsFission(double* ace_xs, int n) {
 }
 
 
+void SDLibrary::setPotential(double potential) {
+  _potential = potential;
+}
+
+
+void SDLibrary::setAwr(double awr) {
+  _awr = awr;
+}
+
+
+double SDLibrary::getPotential() {
+  return _potential;
+}
+
+
+double SDLibrary::getAwr() {
+  return _awr;
+}
+
+
+int SDLibrary::getNPoint() {
+  return _n;
+}
+
+
 double* SDLibrary::getEnergy() {
   return _energy;
 }
@@ -112,15 +139,22 @@ SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
   double u, e, du, r0, r1;
   int i, i0, i1;
 
+  /* Compute lethargy width */
   du = std::log(emax / emin) / n;
+
+  /* First energy point */
   u = std::log(emax / emin) - du / 2.0;
   e = emax * std::exp(-u);
+
+  /* Interpolation index of first energy point */
   for (i = 0; i < n; i++)
     if (energy0[i] > e) {
       i1 = i;
       break;
     }
   i0 = i1 - 1;
+
+  /* Linear-linear interpolation of energy */
   for (i = n-1; i > -1; i--) {
     r0 = (energy0[i1] - e) / (energy0[i1] - energy0[i0]);
     r1 = 1.0 - r0;
@@ -129,6 +163,7 @@ SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
     if (has_res_fis)
       xs_fis[i] = r0 * xs_fis0[i0] + r1 * xs_fis0[i1];
 
+    /* Advance energy point */
     u -= du;
     e = emax * std::exp(-u);
     for (;;) {
@@ -139,6 +174,7 @@ SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
     i0 = i1 - 1;
   }
 
+  /* Set hyper-fine energe group cross sections */
   libh->setXsTotal(xs_tot, n);
   libh->setXsScatter(xs_sca, n);
   if (has_res_fis)
@@ -169,11 +205,18 @@ SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
     xs_sca3, xs_fis3;
   int i, i0, i1, j0, j1;
 
+  /* Compute temperature interpolation ratio */
   rt0 = (temp1 - temp) / (temp1 - temp0);
   rt1 = 1.0 - rt0;
+
+  /* Compute lethargy width */
   du = std::log(emax / emin) / n;
+
+  /* First energy point */
   u = std::log(emax / emin) - du / 2.0;
   e = emax * std::exp(-u);
+
+  /* Interpolation index of first energy point */
   for (i = 0; i < n; i++)
     if (energy0[i] > e) {
       i1 = i;
@@ -186,6 +229,8 @@ SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
       break;
     }
   j0 = j1 - 1;
+
+  /* Linear-linear interpolation of energy and temperature */
   for (i = n-1; i > -1; i--) {
     r0 = (energy0[i1] - e) / (energy0[i1] - energy0[i0]);
     r1 = 1.0 - r0;
@@ -206,6 +251,7 @@ SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
     if (has_res_fis)
       xs_fis[i] = rt0 * xs_fis2 + rt1 * xs_fis3;
 
+    /* Advance energy point */
     u -= du;
     e = emax * std::exp(-u);
     for (;;) {
@@ -222,6 +268,7 @@ SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
     j0 = j1 - 1;
   }
 
+  /* Set hyper-fine energe group cross sections */
   libh->setXsTotal(xs_tot, n);
   libh->setXsScatter(xs_sca, n);
   if (has_res_fis)
@@ -366,10 +413,19 @@ void SDNuclide::setHFFissiion(double* xs, int nfg) {
 
 
 void SDNuclide::setHFLibrary(SDLibrary* lib) {
+  /* Get hyper-fine energy group library */
   _hf_lib = lib;
+  _potential = lib->getPotential();
+  _awr = lib->getAwr();
+  _nfg = lib->getNPoint();
   _hf_tot = lib->getXsTotal();
   _hf_sca = lib->getXsScatter();
   _hf_fis = lib->getXsFission();
+
+  /* This nuclide has resonance */
+  _has_res = true;
+
+  /* Determine whether has resonance fission */
   if (_hf_fis != NULL)
     _has_res_fis = true;
 }
