@@ -168,8 +168,8 @@ class NuclideMicro(object):
             self._has_resfis = True
         else:
             self._has_resfis = False
-        self._average_lambda = f[res_group]['average_lambda']
-        self._average_potential = f[res_group]['average_potential']
+        self._average_lambda = f[res_group]['average_lambda'].value
+        self._average_potential = f[res_group]['average_potential'].value
         if 'lambda' in f[res_group]:
             self._gc_factor = f[res_group]['lambda'].value
         else:
@@ -234,6 +234,10 @@ class LibraryMicro(object):
 
         f.close()
 
+    def set_gc_factor(self, nuclide, ig, gc_factor):
+        jg = ig - self._first_res
+        self._nuclides[nuclide]._gc_factor[jg] = gc_factor
+
     def get_typical_xs(self, nuclide, temp, ig, *args):
         nuc = self._nuclides[nuclide]
         temps = nuc._full_xs_temps
@@ -270,14 +274,27 @@ class LibraryMicro(object):
                     + (1.0 - r) * nuc._xs_nfi[itemp1][ig]
             else:
                 xs['nufis'] = 0.0
+        # Nu
+        if 'nu' in args:
+            xs['nu'] = 0.0
+            if nuc._fissionable:
+                nufis = r * nuc._xs_nfi[itemp0][ig] \
+                        + (1.0 - r) * nuc._xs_nfi[itemp1][ig]
+                fis = r * nuc._xs_fis[itemp0][ig] \
+                    + (1.0 - r) * nuc._xs_fis[itemp1][ig]
+                if fis > 1e-13:
+                    xs['nu'] = nufis / fis
         # XS for resonance groups
         if ig >= nuc._first_res and ig < nuc._last_res:
             # Goldstein-Cohen factor
             if 'lambda' in args:
                 xs['lambda'] = nuc._gc_factor[jg]
             if 'potential' in args:
-                xs['potential'] = r * nuc._potential[itemp0][jg] \
-                    + (1.0 - r) * nuc._potential[itemp1][jg]
+                if nuc._has_res:
+                    xs['potential'] = nuc._average_potential
+                else:
+                    xs['potential'] = r * nuc._potential[itemp0][jg] \
+                        + (1.0 - r) * nuc._potential[itemp1][jg]
 
         return xs
 
@@ -336,3 +353,4 @@ if __name__ == "__main__":
     lib = LibraryMicro()
     lib.load_from_h5(fname)
     print lib.has_res('U238')
+    print lib.last_res - lib.first_res

@@ -19,8 +19,19 @@
  * using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* xs, int num_groups)}
 
+/* The typemap used to match the method signature for the SDSolver
+ * broad energy group boundaries setter methods. This allows users to set the
+ * broad energy group boundaries using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* e_broad, int n_bnd)}
+
+/* The typemap used to match the method signature for the SDNuclide
+ * hyper-fine cross sections setter methods. This allows users to set the
+ * hyper-fine cross sections using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* xs, int nfg)}
+
+/* The typemap used to match the method signature for the SDNuclide
+ * number densities setter methods. This allows users to set the
+ * number densities using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* num_dens, int n_case)}
 
 /* The typemap used to match the method signature for the Cell rotation

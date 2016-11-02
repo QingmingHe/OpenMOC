@@ -145,6 +145,9 @@ private:
   /** Hyper-fine flux */
   double** _flux;
 
+  /** Multi-group flux */
+  double** _mg_flx;
+
   /** Nuclides */
   SDNuclide* _nuclides;
 
@@ -157,9 +160,10 @@ public:
 
   void setErgGrpBnd(double* e_broad, int n_bnd);
   void setNumNuclide(int n_nuc);
-  void setEnergyBnd(double emin, double emax);
+  void setSolErgBnd(double emin, double emax);
   void computeFlux();
   void computeMgXs();
+  double getMgFlux(int ibg, int icase);
   SDNuclide* getNuclide(int id);
 };
 

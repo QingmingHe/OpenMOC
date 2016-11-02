@@ -31,15 +31,12 @@ SDNuclide::~SDNuclide() {
 
   if (_hf_tot != NULL)
     delete[] _hf_tot;
-    /** _hf_tot = NULL; */
 
   if (_hf_sca != NULL)
     delete[] _hf_sca;
-    /** _hf_sca = NULL; */
 
   if (_hf_fis != NULL)
     delete[] _hf_fis;
-    /** _hf_fis = NULL; */
 
   if (_num_dens != NULL)
     delete[] _num_dens;
@@ -90,7 +87,6 @@ void SDNuclide::setHFTotal(double* xs, int nfg) {
   _has_res = true;
 
   /* Copy total cross sections */
-  /** _hf_tot = xs; */
   _hf_tot = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_tot[i] = xs[i];
@@ -108,7 +104,6 @@ void SDNuclide::setHFScatter(double* xs, int nfg) {
   _has_res = true;
 
   /* Copy scatter cross sections */
-  /** _hf_sca = xs; */
   _hf_sca = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_sca[i] = xs[i];
@@ -127,7 +122,6 @@ void SDNuclide::setHFFissiion(double* xs, int nfg) {
   _has_res_fis = true;
 
   /* Copy fission cross sections */
-  /** _hf_fis = xs; */
   _hf_fis = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_fis[i] = xs[i];
@@ -239,6 +233,7 @@ SDSolver::SDSolver() {
   _e_broad = NULL;
   _e_f_b = NULL;
   _flux = NULL;
+  _mg_flx = NULL;
   _nuclides = NULL;
 }
 
@@ -254,6 +249,12 @@ SDSolver::~SDSolver() {
     for (int i=0; i < _n_case; i++)
       delete[] _flux[i];
     delete[] _flux;
+  }
+
+  if (_mg_flx != NULL) {
+    for (int i = 0; i < _nbg; i++)
+      delete[] _mg_flx[i];
+    delete[] _mg_flx;
   }
 
   if (_nuclides != NULL)
@@ -283,7 +284,7 @@ void SDSolver::setNumNuclide(int n_nuc) {
 }
 
 
-void SDSolver::setEnergyBnd(double emin, double emax) {
+void SDSolver::setSolErgBnd(double emin, double emax) {
   _emin = emin;
   _emax = emax;
 }
@@ -457,17 +458,22 @@ void SDSolver::computeMgXs() {
   int ifg;
   int inuc;
   int icase;
-  double flux_broad;
   double* flux;
   double** mg_tot;
   double** mg_sca;
   double** mg_fis;
   SDNuclide* nuc;
 
+  /* Allocate memory for multi-group flux */
+  _mg_flx = new double*[_nbg];
+  for (ibg = 0; ibg < _nbg; ibg++)
+    _mg_flx[ibg] = new double[_n_case];
+
   for (inuc = 0; inuc < _n_nuc; inuc++) {
     nuc = &_nuclides[inuc];
 
     if (nuc->hasRes()) {
+      /* Allocate memory for multi-group cross sections */
       mg_tot = new double*[_nbg];
       for (ibg = 0; ibg < _nbg; ibg++)
         mg_tot[ibg] = new double[_n_case];
@@ -480,6 +486,7 @@ void SDSolver::computeMgXs() {
           mg_fis[ibg] = new double[_n_case];
       }
 
+      /* Condense hyper-fine energy groups to broad energy groups */
       for (ibg = 0; ibg < _nbg; ibg++) {
         for (icase = 0; icase < _n_case; icase++) {
           mg_tot[ibg][icase] = 0.0;
@@ -487,27 +494,33 @@ void SDSolver::computeMgXs() {
           if (nuc->hasResFis())
             mg_fis[ibg][icase] = 0.0;
           flux = _flux[icase];
-          flux_broad = 0.0;
+          _mg_flx[ibg][icase] = 0.0;
           for (ifg = _e_f_b[ibg]; ifg < _e_f_b[ibg+1]; ifg++) {
-            flux_broad += flux[ifg];
+            _mg_flx[ibg][icase] += flux[ifg];
             mg_tot[ibg][icase] += nuc->getHFTotal(ifg) * flux[ifg];
             mg_sca[ibg][icase] += nuc->getHFScatter(ifg) * flux[ifg];
             if (nuc->hasResFis())
               mg_fis[ibg][icase] += nuc->getHFFission(ifg) * flux[ifg];
           }
-          mg_tot[ibg][icase] /= flux_broad;
-          mg_sca[ibg][icase] /= flux_broad;
+          mg_tot[ibg][icase] /= _mg_flx[ibg][icase];
+          mg_sca[ibg][icase] /= _mg_flx[ibg][icase];
           if (nuc->hasResFis())
-            mg_fis[ibg][icase] /= flux_broad;
+            mg_fis[ibg][icase] /= _mg_flx[ibg][icase];
         }
       }
-    }
 
-    nuc->setMgTotal(mg_tot);
-    nuc->setMgScatter(mg_sca);
-    if (nuc->hasResFis())
-      nuc->setMgFission(mg_fis);
+      /* Set multi-group cross sections */
+      nuc->setMgTotal(mg_tot);
+      nuc->setMgScatter(mg_sca);
+      if (nuc->hasResFis())
+        nuc->setMgFission(mg_fis);
+    }
   }
+}
+
+
+double SDSolver::getMgFlux(int ibg, int icase) {
+  return _mg_flx[ibg][icase];
 }
 
 

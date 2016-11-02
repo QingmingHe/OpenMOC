@@ -173,10 +173,14 @@ class ProbTable(object):
                 = self._fit_ir(n_band, idx0, idx1, backgrounds0, backgrounds1)
 
             # Check stability of subgroup parameters
+            # print n_band
+            # print sub_int[n_band]
+            # print sub_sca[n_band]
+            # print sub_tot[n_band]
+            # print sub_wgt[n_band]
             stable = True
             for ib in range(n_band):
                 if sub_tot[n_band][ib] <= 0.0 or sub_sca[n_band][ib] <= 0.0 \
-                   or sub_tot[n_band][ib] < sub_sca[n_band][ib] \
                    or sub_wgt[n_band][ib] <= 0.0 or sub_wgt[n_band][ib] >= 1.0:
                     stable = False
                     break
@@ -280,7 +284,7 @@ class ProbTable(object):
 
     @dilutions.setter
     def dilutions(self, dilutions):
-        self._dilutions = dilutions
+        self._dilutions = np.array(dilutions)
 
     @property
     def xs_abs(self):
@@ -365,6 +369,9 @@ def _get_backgrounds(n_band, gc_factor, potential, dilutions):
         backgrounds0 = [1e1, 28.0, 52.0, 1e2, 2e2, 6e2, 1e3, 1e4]
     elif n_band == 6:
         backgrounds0 = [1e1, 28.0, 40.0, 52.0, 1e2, 2e2, 6e2, 1e3, 1200.0, 1e4]
+    elif n_band == 7:
+        backgrounds0 = [1e1, 28.0, 40.0, 45.0, 52.0, 80.0, 1e2, 2e2, 6e2, 1e3,
+                        1200.0, 1e4]
     else:
         raise Exception('n_band should be smaller than 6')
     idx0, backgrounds0 = _find_nearest_array(dilutions, backgrounds0)

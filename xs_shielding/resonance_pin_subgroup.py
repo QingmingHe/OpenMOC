@@ -7,6 +7,7 @@ from math import ceil
 from library_micro import LibraryMicro
 from time import clock
 import h5py
+from library_pseudo import LibraryPseudo
 
 PINCELLBOX = 1
 PINCELLCYL = 2
@@ -80,12 +81,19 @@ class PinCell(object):
 
 class ResonancePinSubgroup(object):
 
-    def __init__(self, pin_cell=None, pin_solver=None, micro_lib=None):
+    def __init__(self, pin_cell=None, pin_solver=None, micro_lib=None,
+                 use_pseudo_lib=False, cross_sections=None, first_calc_g=None,
+                 last_calc_g=None):
         # Given by user
-        self._pin_cell = None
-        self._pin_solver = None
-        self._micro_lib = None
+        self._pin_cell = pin_cell
+        self._pin_solver = pin_solver
+        self._micro_lib = micro_lib
+        self._use_pseudo_lib = use_pseudo_lib
+        self._cross_sections = cross_sections
+        self._first_calc_g = first_calc_g
+        self._last_calc_g = last_calc_g
 
+        self._pseudo_lib = None
         self._resnuc_xs = None
         self._n_res_reg = None
 
@@ -102,11 +110,17 @@ class ResonancePinSubgroup(object):
         res_nuc = None
         res_mat = None
         for mat in self._pin_cell.materials:
-            for nuc in mat.nuclides:
+            for inuc, nuc in enumerate(mat.nuclides):
                 if self._micro_lib.has_res(nuc):
                     res_nuc = nuc
                     res_mat = mat
+                    res_nuc_dens = mat.densities[inuc]
+                    res_mat_temp = mat.temperature
                     break
+
+        # Initialize pseudo library if needed
+        if self._use_pseudo_lib:
+            self._init_pseudo_lib_one_nuc(res_nuc, res_nuc_dens, res_mat_temp)
 
         # Initialize self-shielded xs. Xs for last region is pin averaged
         # self-shielded xs
@@ -114,9 +128,21 @@ class ResonancePinSubgroup(object):
         self._resnuc_xs[res_nuc] = {}
         self._init_self_shielded_xs()
 
-        for ig in range(self._micro_lib.first_res, self._micro_lib.last_res):
+        if self._first_calc_g is None:
+            first_calc_g = self._micro_lib.first_res
+        else:
+            first_calc_g = self._first_calc_g
+        if self._last_calc_g is None:
+            last_calc_g = self._micro_lib.last_res
+        else:
+            last_calc_g = self._last_calc_g
+        for ig in range(first_calc_g, last_calc_g):
             # Get subgroup parameters
-            subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature, ig)
+            if self._use_pseudo_lib:
+                subp = self._pseudo_lib.get_subp_one_nuc(ig, res_nuc)
+            else:
+                subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature,
+                                                ig)
 
             print ig, subp['n_band']
             if subp['n_band'] > 1:
@@ -140,7 +166,6 @@ class ResonancePinSubgroup(object):
                                     (1.0 - subp['lambda'])
                                 mac_src[ireg] \
                                     += mat.densities[inuc] * \
-                                    subp['sub_wgt'][ib] * \
                                     subp['lambda'] * subp['potential']
                             else:
                                 xs_typ = self._micro_lib.get_typical_xs(
@@ -153,7 +178,6 @@ class ResonancePinSubgroup(object):
                                     * (1.0 - xs_typ['lambda'])
                                 mac_src[ireg] \
                                     += mat.densities[inuc] * \
-                                    subp['sub_wgt'][ib] *\
                                     xs_typ['lambda'] * xs_typ['potential']
 
                     # Solve subgroup fixed source equation and get volume
@@ -161,11 +185,27 @@ class ResonancePinSubgroup(object):
                     self._pin_solver.set_pin_xs(xs_tot=mac_tot, xs_sca=mac_sca,
                                                 source=mac_src)
                     self._pin_solver.solve()
-                    sub_flux[ib, :] = self._pin_solver.flux
+                    sub_flux[ib, :] = self._pin_solver.flux \
+                        * subp['sub_wgt'][ib]
 
                 # Condense self-shielded xs
                 self._condense_self_shielded_xs(ig, subp, res_nuc, sub_flux,
                                                 self._pin_solver.vols)
+
+    def _init_pseudo_lib_one_nuc(self, nuclide, density, temperature):
+        if self._cross_sections is None:
+            raise Exception('cross_sections should be given')
+
+        # Input for library of pseudo nuclide
+        self._pseudo_lib = LibraryPseudo()
+        self._pseudo_lib.nuclides = [nuclide]
+        self._pseudo_lib.densities = [density]
+        self._pseudo_lib.temperature = temperature
+        self._pseudo_lib.cross_sections = self._cross_sections
+        self._pseudo_lib.mglib = self._micro_lib
+
+        # Make the library
+        self._pseudo_lib.make()
 
     def _init_self_shielded_xs(self):
         # Initialize (pin averaged) self_shielded xs at typical dilution
@@ -243,18 +283,22 @@ class ResonancePinSubgroup(object):
         if to_screen:
             for nuc in self._resnuc_xs:
                 print('nuclide', nuc)
-                for ireg in range(n):
-                    print('region', ireg)
-                    for ig in range(n_res):
-                        print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, ireg])
+                # for ireg in range(n):
+                #     print('region', ireg)
+                #     for ig in range(n_res):
+                #         print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, ireg])
                 print('pin averaged')
                 for ig in range(n_res):
-                    print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, n])
+                    print("%4i %f" %
+                          (ig, self._resnuc_xs[nuc]['xs_abs'][ig, n]))
 
         if to_h5 is not None:
             f = h5py.File(to_h5, 'w')
             for nuc in self._resnuc_xs:
                 f.create_group(nuc)
+                f[nuc].create_group('regions')
+                f[nuc]['regions']['xs_abs'] \
+                    = self._resnuc_xs[nuc]['xs_abs'][:, :self._n_res_reg]
                 for ireg in range(self._n_res_reg):
                     reg = 'region%i' % ireg
                     f[nuc].create_group(reg)
@@ -311,12 +355,36 @@ class ResonancePinSubgroup(object):
         self._micro_lib = micro_lib
 
     @property
+    def use_pseudo_lib(self):
+        return self._use_pseudo_lib
+
+    @use_pseudo_lib.setter
+    def use_pseudo_lib(self, use_pseudo_lib):
+        self._use_pseudo_lib = use_pseudo_lib
+
+    @property
+    def cross_sections(self):
+        return self._cross_sections
+
+    @cross_sections.setter
+    def cross_sections(self, cross_sections):
+        self._cross_sections = cross_sections
+
+    @property
     def resnuc_xs(self):
         return self._resnuc_xs
 
     @resnuc_xs.setter
     def resnuc_xs(self, resnuc_xs):
         self._resnuc_xs = resnuc_xs
+
+    @property
+    def n_res_reg(self):
+        return self._n_res_reg
+
+    @n_res_reg.setter
+    def n_res_reg(self, n_res_reg):
+        self._n_res_reg = n_res_reg
 
 
 class PinFixSolver(object):
@@ -663,16 +731,18 @@ def test_pinsolver():
 
 
 def test_subgroup():
+    import os
+    # OpenMC cross sections
+    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
     # Define materials
     fuel = Material(temperature=293.6, nuclides=['U238'],
                     densities=[2.21546e-2], name='fuel')
     mod = Material(temperature=293.6, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
     # Load micro library
-    import os
     fname = os.path.join(os.getenv('HOME'),
                          'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e-25m.h5')
+                         'jeff-3.2-wims69e-1600m.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)
     # Define a pin cell
@@ -693,12 +763,18 @@ def test_subgroup():
         0.41
     ]
     pin.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-    sub = ResonancePinSubgroup()
+    sub = ResonancePinSubgroup(first_calc_g=23, last_calc_g=24)
+    # sub = ResonancePinSubgroup()
     sub.pin_cell = pin
     sub.pin_solver = PinFixSolver()
+    sub.pin_solver.n_ring_fuel = 20
     sub.micro_lib = lib
+    sub.cross_sections = cross_sections
+    sub.use_pseudo_lib = True
     sub.solve()
-    sub.print_self_shielded_xs(to_h5='simple-pin.h5', to_screen=False)
+    sub.print_self_shielded_xs(to_h5='simple-pin.h5', to_screen=True)
 
 if __name__ == '__main__':
+    # recommend run with:
+    # $ ./resonance_pin_subgroup.py -s 0.005 -a 216
     test_subgroup()
