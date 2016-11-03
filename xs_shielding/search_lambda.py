@@ -51,7 +51,7 @@ def search_lambda():
     # Load micro library
     fname = os.path.join(os.getenv('HOME'),
                          'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e-1600m.h5')
+                         'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)
 

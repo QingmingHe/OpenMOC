@@ -41,7 +41,7 @@ def _find_temp_interp_index(kT, kTs):
     return i0, i1
 
 
-def _is_disappearance(mt):
+def is_disappearance(mt):
     if mt >= _N_GAMMA and mt <= _N_DA:
         return True
     elif mt >= _N_P0 and mt <= _N_AC:
@@ -247,7 +247,7 @@ class LibraryCe(object):
             xs = f[nuclide]['reactions'][reaction][kT_grp]['xs']
             i = xs.attrs['threshold_idx'] - 1
             n = xs.shape[0]
-            if _is_disappearance(mt):
+            if is_disappearance(mt):
                 xs_tot[i:i+n] += xs.value
             if mt == _ELASTIC:
                 xs_tot[i:i+n] = xs.value
