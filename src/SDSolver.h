@@ -51,15 +51,15 @@ public:
   double getPotential();
   double getAwr();
   int getNPoint();
+  static SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin,
+                                 int n, bool has_res_fis);
+  static SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
+                                            double temp0, double temp1,
+                                            double temp, double emax,
+                                            double emin, int n,
+                                            bool has_res_fis);
 };
 
-SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
-                        bool has_res_fis);
-
-SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
-                                   double temp0, double temp1, double temp,
-                                   double emax, double emin, int n,
-                                   bool has_res_fis);
 
 class SDNuclide {
 
@@ -217,7 +217,7 @@ public:
   void setNumNuclide(int n_nuc);
   void setSolErgBnd(double emin, double emax);
   void computeFlux();
-  void computeMgXs();
+  void computeMgXs(SDNuclide* nuclide=NULL);
   double getMgFlux(int ibg, int icase);
   SDNuclide* getNuclide(int id);
 };

@@ -26,6 +26,9 @@ def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
     if pto.n_band < n_band:
         n_band = pt.n_band
 
+    if n_band == 0:
+        return 0
+
     # Refit the probability tables
     pt_ave = None
     for i in range(len(rxs)+1):
@@ -66,6 +69,8 @@ def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
         if has_resfis:
             pt['sub_nfi'] *= r
 
+    return n_band
+
 
 def unify_sub_wgt(pts, has_resfis=False):
     # Calculate unified accumulated weights
@@ -81,6 +86,9 @@ def unify_sub_wgt(pts, has_resfis=False):
             unif_acc.extend(acc)
     unif_acc = sorted(list(set(unif_acc)))
     n_band = len(unif_acc)
+
+    if n_band == 0:
+        return 0
 
     # Calculate unified subgroup weights
     unif_wgt = np.zeros(n_band)
@@ -119,6 +127,8 @@ def unify_sub_wgt(pts, has_resfis=False):
             pt['sub_wgt'] = unif_wgt
             if has_resfis:
                 pt['sub_nfi'] = sub_nfi
+
+    return n_band
 
 
 class ProbTable(object):

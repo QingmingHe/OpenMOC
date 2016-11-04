@@ -31,10 +31,11 @@ SDLibrary::~SDLibrary() {
 void SDLibrary::setEnergy(double* ace_xs, int n) {
   if (_n == 0)
     _n = n;
-  else
-    if (_n != n)
-      log_printf(ERROR, "number of energy point incompatible");
+  else if (_n != n)
+    log_printf(ERROR, "number of energy point incompatible");
 
+  if (_energy != NULL)
+    delete[] _energy;
   _energy = new double[n];
   for (int i = 0; i < n; i++)
     _energy[i] = ace_xs[i];
@@ -44,10 +45,11 @@ void SDLibrary::setEnergy(double* ace_xs, int n) {
 void SDLibrary::setXsTotal(double* ace_xs, int n) {
   if (_n == 0)
     _n = n;
-  else
-    if (_n != n)
-      log_printf(ERROR, "number of energy point incompatible");
+  else if (_n != n)
+    log_printf(ERROR, "number of energy point incompatible");
 
+  if (_xs_tot != NULL)
+    delete[] _xs_tot;
   _xs_tot = new double[n];
   for (int i = 0; i < n; i++)
     _xs_tot[i] = ace_xs[i];
@@ -57,10 +59,11 @@ void SDLibrary::setXsTotal(double* ace_xs, int n) {
 void SDLibrary::setXsScatter(double* ace_xs, int n) {
   if (_n == 0)
     _n = n;
-  else
-    if (_n != n)
-      log_printf(ERROR, "number of energy point incompatible");
+  else if (_n != n)
+    log_printf(ERROR, "number of energy point incompatible");
 
+  if (_xs_sca != NULL)
+    delete[] _xs_sca;
   _xs_sca = new double[n];
   for (int i = 0; i < n; i++)
     _xs_sca[i] = ace_xs[i];
@@ -70,11 +73,13 @@ void SDLibrary::setXsScatter(double* ace_xs, int n) {
 void SDLibrary::setXsFission(double* ace_xs, int n) {
   if (_n == 0)
     _n = n;
-  else
-    if (_n != n)
-      log_printf(ERROR, "number of energy point incompatible");
+  else if (_n != n)
+    log_printf(ERROR, "number of energy point incompatible");
 
   _has_fis = true;
+
+  if (_xs_fis != NULL)
+    delete[] _xs_fis;
   _xs_fis = new double[n];
   for (int i = 0; i < n; i++)
     _xs_fis[i] = ace_xs[i];
@@ -126,8 +131,8 @@ double* SDLibrary::getXsFission() {
 }
 
 
-SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
-                        bool has_res_fis) {
+SDLibrary* SDLibrary::interpEnergy(SDLibrary* lib, double emax, double emin,
+                                   int n, bool has_res_fis) {
   SDLibrary* libh = new SDLibrary;
   double* xs_tot = new double[n];
   double* xs_sca = new double[n];
@@ -138,6 +143,10 @@ SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
   double* xs_fis0 = lib->getXsFission();
   double u, e, du, r0, r1;
   int i, i0, i1;
+
+  /* Copy potential and atomic weight ratio */
+  libh->setPotential(lib->getPotential());
+  libh->setAwr(lib->getAwr());
 
   /* Compute lethargy width */
   du = std::log(emax / emin) / n;
@@ -185,10 +194,11 @@ SDLibrary* interpEnergy(SDLibrary* lib, double emax, double emin, int n,
   return libh;
 }
 
-SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
-                                   double temp0, double temp1, double temp,
-                                   double emax, double emin, int n,
-                                   bool has_res_fis) {
+SDLibrary* SDLibrary::interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
+                                              double temp0, double temp1,
+                                              double temp, double emax,
+                                              double emin, int n,
+                                              bool has_res_fis) {
   SDLibrary* libh = new SDLibrary;
   double* xs_tot = new double[n];
   double* xs_sca = new double[n];
@@ -204,6 +214,10 @@ SDLibrary* interpEnergyTemperature(SDLibrary* lib0, SDLibrary* lib1,
   double u, e, du, r0, r1, rt0, rt1, xs_tot2, xs_sca2, xs_fis2, xs_tot3,
     xs_sca3, xs_fis3;
   int i, i0, i1, j0, j1;
+
+  /* Copy potential and atomic weight ratio */
+  libh->setPotential(lib0->getPotential());
+  libh->setAwr(lib0->getAwr());
 
   /* Compute temperature interpolation ratio */
   rt0 = (temp1 - temp) / (temp1 - temp0);
@@ -371,6 +385,8 @@ void SDNuclide::setHFTotal(double* xs, int nfg) {
   _has_res = true;
 
   /* Copy total cross sections */
+  if (_hf_tot != NULL)
+    delete[] _hf_tot;
   _hf_tot = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_tot[i] = xs[i];
@@ -388,6 +404,8 @@ void SDNuclide::setHFScatter(double* xs, int nfg) {
   _has_res = true;
 
   /* Copy scatter cross sections */
+  if (_hf_sca != NULL)
+    delete[] _hf_sca;
   _hf_sca = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_sca[i] = xs[i];
@@ -406,6 +424,8 @@ void SDNuclide::setHFFissiion(double* xs, int nfg) {
   _has_res_fis = true;
 
   /* Copy fission cross sections */
+  if (_hf_fis != NULL)
+    delete[] _hf_fis;
   _hf_fis = new double[nfg];
   for (int i=0; i < nfg; i++)
     _hf_fis[i] = xs[i];
@@ -756,24 +776,40 @@ void SDSolver::computeFlux() {
 }
 
 
-void SDSolver::computeMgXs() {
+void SDSolver::computeMgXs(SDNuclide* nuclide) {
   int ibg;
   int ifg;
   int inuc;
   int icase;
+  int n_nuc;
   double* flux;
   double** mg_tot;
   double** mg_sca;
   double** mg_fis;
   SDNuclide* nuc;
 
+  /* Number of nuclide */
+  if (nuclide != NULL)
+    n_nuc = _n_nuc;
+  else
+    n_nuc = 1;
+
   /* Allocate memory for multi-group flux */
+  if (_mg_flx != NULL) {
+    for (ibg = 0; ibg < _nbg; ibg++)
+      delete[] _mg_flx[ibg];
+    delete[] _mg_flx;
+  }
   _mg_flx = new double*[_nbg];
   for (ibg = 0; ibg < _nbg; ibg++)
     _mg_flx[ibg] = new double[_n_case];
 
-  for (inuc = 0; inuc < _n_nuc; inuc++) {
-    nuc = &_nuclides[inuc];
+  for (inuc = 0; inuc < n_nuc; inuc++) {
+    /* Get nuclide pointer */
+    if (nuclide != NULL)
+      nuc = nuclide;
+    else
+      nuc = &_nuclides[inuc];
 
     if (nuc->hasRes()) {
       /* Allocate memory for multi-group cross sections */

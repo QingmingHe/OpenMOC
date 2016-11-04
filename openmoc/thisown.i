@@ -20,12 +20,12 @@
 %}
 
 /* Python must free memory for each SDLibrary returned by interpEnergy */
-%pythonappend interpEnergy %{
+%pythonappend SDLibrary::interpEnergy %{
   val.thisown = True
 %}
 
 /* Python must free memory for each SDLibrary returned by interpEnergyTemperature */
-%pythonappend interpEnergyTemperature %{
+%pythonappend SDLibrary::interpEnergyTemperature %{
   val.thisown = True
 %}
 

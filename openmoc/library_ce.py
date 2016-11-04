@@ -6,7 +6,8 @@ import numpy as np
 from math import log, exp
 from bisect import bisect
 from potentials import average_potential
-from openmoc import SDLibrary, interpEnergy, interpEnergyTemperature
+from openmoc import (SDLibrary, SDLibrary_interpEnergy,
+                     SDLibrary_interpEnergyTemperature)
 
 _K_BOLTZMANN = 8.6173324e-11
 _N_GAMMA = 102
@@ -210,7 +211,7 @@ class LibraryCe(object):
             # Only energy point interpolation
             acelib = self.get_xs_by_kT_grp(f, nuclide, kT_grps[ii],
                                            has_res_fis)
-            hflib = interpEnergy(acelib, emax, emin, n, has_res_fis)
+            hflib = SDLibrary_interpEnergy(acelib, emax, emin, n, has_res_fis)
         else:
             # Find temperature interpolation index
             i0, i1 = _find_temp_interp_index(kT, kTs)
@@ -220,13 +221,9 @@ class LibraryCe(object):
                                             has_res_fis)
             acelib1 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
                                             has_res_fis)
-            hflib = interpEnergyTemperature(
+            hflib = SDLibrary_interpEnergyTemperature(
                 acelib0, acelib1, kTs[i0], kTs[i1], kT, emax, emin, n,
                 has_res_fis)
-
-        # Get potential and atomic weight ratio
-        hflib.setPotential(average_potential(nuclide))
-        hflib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
 
         f.close()
 
@@ -257,6 +254,8 @@ class LibraryCe(object):
                     xs_fis[i:i+n] += xs.value
 
         acelib = SDLibrary()
+        acelib.setPotential(average_potential(nuclide))
+        acelib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
         acelib.setEnergy(energy)
         acelib.setXsTotal(xs_tot)
         acelib.setXsScatter(xs_sca)

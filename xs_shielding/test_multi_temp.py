@@ -56,6 +56,7 @@ def test_one_nuc_multi_temp():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    pin.ave_temp = 975.0
     # sub = ResonancePinSubgroup(first_calc_g=23, last_calc_g=24)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
