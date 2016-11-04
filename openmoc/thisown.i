@@ -2,6 +2,33 @@
 
 %module thisown
 
+/* A SDNuclide owns the memory for each SDLibrary it contains */
+%pythonappend SDNuclide::setHFLibrary %{
+  # SWIG 3
+  if 'lib' in locals():
+    lib = locals()['lib']
+  elif 'args' in locals() and 'lib' in locals()['args']:
+    lib = locals()['args']['lib']
+  elif 'kwargs' in locals() and 'lib' in locals()['kwargs']:
+    lib = locals()['kwargs']['lib']
+
+  # SWIG 2
+  else:
+    lib = locals()['args'][0]
+
+  lib.thisown = False
+%}
+
+/* Python must free memory for each SDLibrary returned by interpEnergy */
+%pythonappend interpEnergy %{
+  val.thisown = True
+%}
+
+/* Python must free memory for each SDLibrary returned by interpEnergyTemperature */
+%pythonappend interpEnergyTemperature %{
+  val.thisown = True
+%}
+
 /* A Cell owns the memory for each Surface it contains */
 %pythonappend Cell::addSurface %{
   # SWIG 3
