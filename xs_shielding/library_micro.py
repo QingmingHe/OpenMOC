@@ -44,6 +44,60 @@ class NuclideMicro(object):
         self._res_nfi = None
         self._dilutions = None
 
+    def anti_interp_res_tbl(self, temp, ig, xs_abs=None, xs_tot=None,
+                            xs_sca=None, xs_nfi=None):
+        res_tbl = self.temp_interp_res_tbl(temp, ig)
+        dilutions = res_tbl['dilutions']
+        n_dilution = len(dilutions)
+        if xs_abs is not None:
+            xs = xs_abs
+            res_xs = res_tbl['res_abs']
+        elif xs_tot is not None:
+            xs = xs_tot
+            res_xs = res_tbl['res_tot']
+        elif xs_sca is not None:
+            xs = xs_sca
+            res_xs = res_tbl['res_sca']
+        elif xs_nfi is not None:
+            xs = xs_nfi
+            res_xs = res_tbl['res_nfi']
+        i1 = bisect(res_xs, xs)
+        if i1 == 0:
+            i1 = 1
+        elif i1 == n_dilution:
+            i1 = n_dilution - 1
+        i0 = i1 - 1
+        r = (res_xs[i1] - xs) / (res_xs[i1] - res_xs[i0])
+        xs_dlt = ((sqrt(dilutions[i0]) * r + sqrt(dilutions[i1]) * (1.0 - r))
+                  ** 2)
+        return xs_dlt
+
+    def temp_dlt_interp_res_tbl(self, temp, dlt, ig):
+        res_tbl = self.temp_interp_res_tbl(temp, ig)
+        dilutions = res_tbl['dilutions']
+        n_dilution = len(dilutions)
+        i1 = bisect(dlt, dilutions)
+        if i1 == 0:
+            i1 = 1
+        elif i1 == n_dilution:
+            i1 = n_dilution - 1
+        i0 = i1 - 1
+        r = (sqrt(dilutions[i1]) - dlt) / \
+            (sqrt(dilutions[i1]) - sqrt(dilutions[i0]))
+        res_abs = res_tbl['res_abs']
+        xs_abs = r * res_abs[i0] + (1.0 - r) * res_abs[i1]
+        res_tot = res_tbl['res_tot']
+        xs_tot = r * res_tot[i0] + (1.0 - r) * res_tot[i1]
+        res_sca = res_tbl['res_sca']
+        xs_sca = r * res_sca[i0] + (1.0 - r) * res_sca[i1]
+        if self._has_resfis:
+            res_nfi = res_tbl['res_nfi']
+            xs_nfi = r * res_nfi[i0] + (1.0 - r) * res_nfi[i1]
+        else:
+            xs_nfi = None
+        return {'xs_abs': xs_abs, 'xs_tot': xs_tot, 'xs_sca': xs_sca,
+                'xs_nfi': xs_nfi}
+
     def temp_interp_res_tbl(self, temp, ig):
         jg = ig - self._first_res
         if self._has_res:
@@ -233,6 +287,12 @@ class LibraryMicro(object):
                 self._nuclides[nuclide].load_from_h5(nuclide, fh=f)
 
         f.close()
+
+    def anti_interp_res_tbl(self, nuclide, temp, ig, xs_abs=None, xs_tot=None,
+                            xs_sca=None, xs_nfi=None):
+        return self._nuclides[nuclide].anti_interp_res_tbl(
+            temp, ig, xs_abs=xs_abs, xs_tot=xs_tot, xs_sca=xs_sca,
+            xs_nfi=xs_nfi)
 
     def set_gc_factor(self, nuclide, ig, gc_factor):
         jg = ig - self._first_res

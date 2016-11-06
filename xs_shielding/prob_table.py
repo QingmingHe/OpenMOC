@@ -2,40 +2,23 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from math import sqrt
-from copy import deepcopy
 
 _NO_RESONANCE = 0.998
 
 
-def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
-    # Fit probability table at average temperature
-    pto = ProbTable()
-    pto.gc_factor = rx_ave['lambda']
-    pto.potential = rx_ave['potential']
-    pto.dilutions = rx_ave['dilutions']
-    pto.xs_abs = rx_ave['res_abs']
-    pto.xs_sca = rx_ave['res_sca']
-    pto.xs_nfi = rx_ave['res_nfi']
-    pto.fit()
-
+def adjust_sub_level(pts, rxs, has_resfis=False):
     # Get the min number of band
     n_band = 100
     for pt in pts:
         if pt['n_band'] < n_band:
             n_band = pt['n_band']
-    if pto.n_band < n_band:
-        n_band = pt.n_band
 
     if n_band == 0:
         return 0
 
     # Refit the probability tables
-    pt_ave = None
-    for i in range(len(rxs)+1):
-        if i < len(rxs):
-            rx = rxs[i]
-        else:
-            rx = rx_ave
+    for i in range(len(rxs)):
+        rx = rxs[i]
         pto = ProbTable()
         pto.gc_factor = rx['lambda']
         pto.potential = rx['potential']
@@ -45,11 +28,7 @@ def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
         pto.xs_nfi = rx['res_nfi']
         pto.fit(n_band, n_band+1)
         # Obtain the new probability tables
-        if i < len(rxs):
-            pt = pts[i]
-        else:
-            pt_ave = deepcopy(pts[0])
-            pt = pt_ave
+        pt = pts[i]
         pt['n_band'] = pto.n_band
         pt['sub_tot'] = pto.sub_tot
         pt['sub_abs'] = pto.sub_abs
@@ -59,7 +38,9 @@ def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
             pt['sub_nfi'] = pto.sub_nfi
 
     # Adjust the subgroup weights by preserving the absorption resonance
-    # integral at infinite dilution
+    # integral at infinite dilution. The last probability table and resonance xs
+    # table are those at average temperature
+    pt_ave = pts[-1]
     for pt in pts:
         r = pt['sub_wgt'] / pt_ave['sub_wgt']
         pt['sub_wgt'] = pt_ave['sub_wgt']
@@ -70,6 +51,20 @@ def adjust_sub_wgt(pts, rxs, rx_ave, has_resfis=False):
             pt['sub_nfi'] *= r
 
     return n_band
+
+
+def _remove_dup(unif_acc):
+    idx = []
+    for i in range(1, len(unif_acc)):
+        val = unif_acc[i]
+        for j in range(i):
+            if abs(val - unif_acc[j]) < 1e-13:
+                idx.append(j)
+    acc = []
+    for i in range(len(unif_acc)):
+        if i not in idx:
+            acc.append(unif_acc[i])
+    return acc
 
 
 def unify_sub_wgt(pts, has_resfis=False):
@@ -84,7 +79,7 @@ def unify_sub_wgt(pts, has_resfis=False):
             for ib in range(1, pt['n_band']):
                 acc.append(acc[ib-1] + pt['sub_wgt'][ib])
             unif_acc.extend(acc)
-    unif_acc = sorted(list(set(unif_acc)))
+    unif_acc = sorted(_remove_dup(unif_acc))
     n_band = len(unif_acc)
 
     if n_band == 0:
@@ -111,15 +106,17 @@ def unify_sub_wgt(pts, has_resfis=False):
                 sub_sca[ib1] = pt['sub_sca'][ib0]
                 if has_resfis:
                     sub_nfi[ib1] = pt['sub_nfi'][ib0]
-                if wgts_acc[i][ib0] < unif_acc[ib1]:
-                    ib0 += 1
-                elif wgts_acc[i][ib0] == unif_acc[ib1]:
+
+                if abs(wgts_acc[i][ib0] - unif_acc[ib1]) < 1e-13:
                     ib0 += 1
                     ib1 += 1
+                elif wgts_acc[i][ib0] < unif_acc[ib1]:
+                    ib0 += 1
                 else:
                     ib1 += 1
                 if ib0 == pt['n_band'] and ib1 == n_band:
                     break
+
             pt['n_band'] = n_band
             pt['sub_tot'] = sub_tot
             pt['sub_abs'] = sub_abs
@@ -183,15 +180,11 @@ class ProbTable(object):
                 = self._fit_ir(n_band, idx0, idx1, backgrounds0, backgrounds1)
 
             # Check stability of subgroup parameters
-            # print n_band
-            # print sub_int[n_band]
-            # print sub_sca[n_band]
-            # print sub_tot[n_band]
-            # print sub_wgt[n_band]
             stable = True
             for ib in range(n_band):
                 if sub_tot[n_band][ib] <= 0.0 or sub_sca[n_band][ib] <= 0.0 \
-                   or sub_wgt[n_band][ib] <= 0.0 or sub_wgt[n_band][ib] >= 1.0:
+                   or sub_wgt[n_band][ib] <= 0.0 or sub_wgt[n_band][ib] >= 1.0 \
+                   or sub_sca[n_band][ib] > 2.0 * sub_tot[n_band][ib]:
                     stable = False
                     break
 

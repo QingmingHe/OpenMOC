@@ -6,7 +6,8 @@ from openmoc.process import get_scalar_fluxes
 from math import ceil
 import h5py
 from library_pseudo import LibraryPseudo
-from prob_table import adjust_sub_wgt, unify_sub_wgt
+from prob_table import adjust_sub_level, unify_sub_wgt
+from copy import deepcopy
 
 PINCELLBOX = 1
 PINCELLCYL = 2
@@ -93,7 +94,7 @@ class ResonancePinSubgroup(object):
 
     def __init__(self, pin_cell=None, pin_solver=None, micro_lib=None,
                  use_pseudo_lib=False, cross_sections=None, first_calc_g=None,
-                 last_calc_g=None):
+                 last_calc_g=None, pin_cell_ave=None):
         # Given by user
         self._pin_cell = pin_cell
         self._pin_solver = pin_solver
@@ -102,11 +103,41 @@ class ResonancePinSubgroup(object):
         self._cross_sections = cross_sections
         self._first_calc_g = first_calc_g
         self._last_calc_g = last_calc_g
+        self._pin_cell_ave = pin_cell_ave
 
         self._pseudo_lib = None
         self._pseudo_libs = None
         self._resnuc_xs = None
         self._n_res_reg = None
+
+    def solve_adjust_numdens(self):
+        # Solve problem at effective temperature
+        if self.pin_cell_ave is None:
+            raise Exception('pin_cell_ave should be given')
+        ave_solver = ResonancePinSubgroup()
+        ave_solver.pin_cell = self.pin_cell_ave
+        ave_solver.pin_solver = self.pin_solver
+        ave_solver.micro_lib = self.micro_lib
+        ave_solver.use_pseudo_lib = self.use_pseudo_lib
+        ave_solver.cross_sections = self.cross_sections
+        ave_solver.first_calc_g = self.first_calc_g
+        ave_solver.last_calc_g = self.last_calc_g
+        ave_solver.solve_onenuc_onetemp()
+
+        if self._pin_cell.ave_temp is None:
+            raise Exception('ave_temp of PinCell should be given')
+
+        # Set pin geometry
+        self._pin_solver.set_pin_geometry(self._pin_cell)
+
+        # Count number of resonant region
+        self._count_n_res_reg()
+
+        # Initialize subgroup macro xs
+        n_region = len(self._pin_cell.mat_fill)
+        mac_tot = np.zeros(n_region)
+        mac_sca = np.zeros(n_region)
+        mac_src = np.zeros(n_region)
 
     def solve_unify_sub_wgt(self):
         if self._pin_cell.ave_temp is None:
@@ -126,13 +157,14 @@ class ResonancePinSubgroup(object):
 
         # Initialize pseudo library
         res_nuc_temps = []
-        for mat in self._pin_cell.matertials:
+        for mat in self._pin_cell.materials:
             for inuc, nuc in enumerate(mat.nuclides):
                 if self._micro_lib.has_res(nuc):
                     res_nuc = nuc
                     res_nuc_dens = mat.densities[inuc]
                     res_nuc_temps.append(mat.temperature)
-        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps)
+        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps,
+                                         self._pin_cell.ave_temp)
 
         # Whether has resonance fission
         has_resfis = self._micro_lib.has_resfis(res_nuc)
@@ -154,15 +186,16 @@ class ResonancePinSubgroup(object):
         for ig in range(first_calc_g, last_calc_g):
             # Get subgroup parameters at different temperatures
             pts = []
-            for itemp, temp in res_nuc_temps:
+            for itemp, temp in enumerate(res_nuc_temps):
                 plib = self._pseudo_libs[itemp]
                 pts.append(plib.get_subp_one_nuc(ig, res_nuc))
 
             # Unify subgroup parameters
             n_band = unify_sub_wgt(pts, has_resfis)
 
+            print(ig, n_band)
             if n_band > 1:
-                sub_flux = np.zeros(n_band, n_region)
+                sub_flux = np.zeros((n_band, n_region))
                 for ib in range(n_band):
                     mac_tot[:] = 0.0
                     mac_sca[:] = 0.0
@@ -209,7 +242,7 @@ class ResonancePinSubgroup(object):
                 self._condense_self_shielded_xs(
                     ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
 
-    def solve_adjust_sub_wgt(self):
+    def solve_adjust_sub_level(self):
         if self._pin_cell.ave_temp is None:
             raise Exception('ave_temp of PinCell should be given')
 
@@ -227,13 +260,14 @@ class ResonancePinSubgroup(object):
 
         # Initialize pseudo library
         res_nuc_temps = []
-        for mat in self._pin_cell.matertials:
+        for mat in self._pin_cell.materials:
             for inuc, nuc in enumerate(mat.nuclides):
                 if self._micro_lib.has_res(nuc):
                     res_nuc = nuc
                     res_nuc_dens = mat.densities[inuc]
                     res_nuc_temps.append(mat.temperature)
-        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps)
+        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps,
+                                         self._pin_cell.ave_temp)
 
         # Whether has resonance fission
         has_resfis = self._micro_lib.has_resfis(res_nuc)
@@ -255,22 +289,21 @@ class ResonancePinSubgroup(object):
         for ig in range(first_calc_g, last_calc_g):
             # Get resonance tables at different temperatures
             rxs = []
-            for temp in res_nuc_temps:
-                rxs.append(self._micro_lib.temp_interp_res_tbl(temp, ig))
-            rx_ave = self._micro_lib.temp_interp_res_tbl(
-                self._pin_cell.ave_temp, ig)
+            for itemp in range(len(res_nuc_temps)+1):
+                rxs.append(self._pseudo_libs[itemp].get_res_tbl(ig, res_nuc))
 
             # Get subgroup parameters at different temperatures
             pts = []
-            for itemp, temp in res_nuc_temps:
+            for itemp in range(len(res_nuc_temps)+1):
                 plib = self._pseudo_libs[itemp]
                 pts.append(plib.get_subp_one_nuc(ig, res_nuc))
 
             # Adjust subgroup parameters
-            n_band = adjust_sub_wgt(pts, rxs, rx_ave, has_resfis)
+            n_band = adjust_sub_level(pts, rxs, has_resfis)
 
+            print(ig, n_band)
             if n_band > 1:
-                sub_flux = np.zeros(n_band, n_region)
+                sub_flux = np.zeros((n_band, n_region))
                 for ib in range(n_band):
                     mac_tot[:] = 0.0
                     mac_sca[:] = 0.0
@@ -366,7 +399,7 @@ class ResonancePinSubgroup(object):
                 subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature,
                                                 ig)
 
-            print ig, subp['n_band']
+            print(ig, subp['n_band'])
             if subp['n_band'] > 1:
                 sub_flux = np.zeros((subp['n_band'], n_region))
                 for ib in range(subp['n_band']):
@@ -414,12 +447,15 @@ class ResonancePinSubgroup(object):
                 self._condense_self_shielded_xs(
                     ig, res_nuc, sub_flux, self._pin_solver.vols, pt=subp)
 
-    def _init_plib_onenuc_multitemp(self, nuclide, density, temperatures):
+    def _init_plib_onenuc_multitemp(self, nuclide, density, temperatures,
+                                    ave_temp):
         if self._cross_sections is None:
             raise Exception('cross_sections should be given')
 
         self._pseudo_libs = []
-        for temp in temperatures:
+        temps = deepcopy(temperatures)
+        temps.append(ave_temp)
+        for temp in temps:
             plib = LibraryPseudo()
             plib.nuclides = [nuclide]
             plib.densities = [density]
@@ -606,6 +642,30 @@ class ResonancePinSubgroup(object):
     @cross_sections.setter
     def cross_sections(self, cross_sections):
         self._cross_sections = cross_sections
+
+    @property
+    def first_calc_g(self):
+        return self._first_calc_g
+
+    @first_calc_g.setter
+    def first_calc_g(self, first_calc_g):
+        self._first_calc_g = first_calc_g
+
+    @property
+    def last_calc_g(self):
+        return self._last_calc_g
+
+    @last_calc_g.setter
+    def last_calc_g(self, last_calc_g):
+        self._last_calc_g = last_calc_g
+
+    @property
+    def pin_cell_ave(self):
+        return self._pin_cell_ave
+
+    @pin_cell_ave.setter
+    def pin_cell_ave(self, pin_cell_ave):
+        self._pin_cell_ave = pin_cell_ave
 
     @property
     def resnuc_xs(self):

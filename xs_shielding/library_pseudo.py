@@ -188,6 +188,20 @@ class LibraryPseudo(object):
                     self._res_nfi[jg, self._n_nuclide, :] \
                         += self._res_nfi[jg, inuc, :] * self._ratios[inuc]
 
+    def get_res_tbl(self, ig, nuclide):
+        jg = ig - self._mglib.first_res
+        inuc = self._nuclides.index(nuclide)
+        res_abs = self._res_abs[jg, inuc, :]
+        res_sca = self._res_sca[jg, inuc, :]
+        res_tot = res_abs + res_sca
+        if self._has_res_fis:
+            res_nfi = self._res_nfi[jg, inuc, :]
+        else:
+            res_nfi = None
+        return {'res_tot': res_tot, 'res_abs': res_abs, 'res_sca': res_sca,
+                'res_nfi': res_nfi, 'dilutions': self._dilutions,
+                'lambda': self._gc_factor[jg], 'potential': self._potential[jg]}
+
     def get_subp_one_nuc(self, ig, nuclide):
         mglib = self._mglib
         jg = ig - mglib.first_res

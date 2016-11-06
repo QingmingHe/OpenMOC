@@ -30,7 +30,7 @@ def _solve_pin(res_nuc, ig, pin, lib, gc_factor, cross_sections):
     sub_solver.cross_sections = cross_sections
     sub_solver.use_pseudo_lib = True
     sub_solver.micro_lib = lib
-    sub_solver.solve()
+    sub_solver.solve_onenuc_onetemp()
 
     # Return the self-shielded cross section
     jg = ig - lib.first_res
@@ -43,9 +43,9 @@ def search_lambda():
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
     # Define materials
     res_nuc = 'U238'
-    fuel = Material(temperature=293.6, nuclides=[res_nuc],
+    fuel = Material(temperature=975.0, nuclides=[res_nuc],
                     densities=[2.21546e-2], name='fuel')
-    mod = Material(temperature=293.6, nuclides=['H1'],
+    mod = Material(temperature=600.0, nuclides=['H1'],
                    densities=[0.0662188], name='moderator')
 
     # Load micro library
@@ -75,13 +75,15 @@ def search_lambda():
     pin.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 
     # The reference self-shielded xs
-    ref_xs_abs = np.array([0.513458, 0.609082, 0.694957, 0.730414, 0.935774,
-                           0.868877, 1.171881, 1.323425, 1.501268, 2.342564,
-                           2.021516, 4.386066, 5.950809, 0.471533, 7.710637,
-                           0.637616, 0.513461, 0.464677, 0.454200, 0.465496,
-                           0.478595, 0.487099, 0.490098, 0.493295, 0.496601,
-                           0.500174, 0.503634, 0.507345, 0.511067, 0.516325,
-                           0.525729, 0.539640, 0.570506])
+    ref_xs_abs = np.array([
+        0.5226338498, 0.6272999690, 0.7310751679, 0.7864303188, 1.0500013692,
+        1.0137941643, 1.4013544272, 1.6713807513, 1.9093500475, 2.8526174370,
+        2.3513961476, 4.5904784947, 6.3146473462, 0.4743688808, 8.1354607075,
+        0.6380476135, 0.5137847193, 0.4648261301, 0.4542975535, 0.4655661499,
+        0.4786617039, 0.4871682954, 0.4901645764, 0.4933614742, 0.4966692551,
+        0.5002436474, 0.5037097883, 0.5074206382, 0.5111444645, 0.5163989932,
+        0.5258026157, 0.5396899828, 0.5703013368
+    ])
 
     # Search lambda for each group
     gc_factors = np.zeros(lib.last_res - lib.first_res)
