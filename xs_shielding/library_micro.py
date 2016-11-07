@@ -70,19 +70,25 @@ class NuclideMicro(object):
         r = (res_xs[i1] - xs) / (res_xs[i1] - res_xs[i0])
         xs_dlt = ((sqrt(dilutions[i0]) * r + sqrt(dilutions[i1]) * (1.0 - r))
                   ** 2)
+
+        if xs_dlt > self._dilutions[-1]:
+            xs_dlt = self._dilutions[-1]
+        elif xs_dlt < self._dilutions[0]:
+            xs_dlt = self._dilutions[0]
+
         return xs_dlt
 
-    def temp_dlt_interp_res_tbl(self, temp, dlt, ig):
+    def temp_dlt_interp_res_tbl(self, temp, xs_dlt, ig):
         res_tbl = self.temp_interp_res_tbl(temp, ig)
         dilutions = res_tbl['dilutions']
         n_dilution = len(dilutions)
-        i1 = bisect(dlt, dilutions)
+        i1 = bisect(dilutions, xs_dlt)
         if i1 == 0:
             i1 = 1
         elif i1 == n_dilution:
             i1 = n_dilution - 1
         i0 = i1 - 1
-        r = (sqrt(dilutions[i1]) - dlt) / \
+        r = (sqrt(dilutions[i1]) - sqrt(xs_dlt)) / \
             (sqrt(dilutions[i1]) - sqrt(dilutions[i0]))
         res_abs = res_tbl['res_abs']
         xs_abs = r * res_abs[i0] + (1.0 - r) * res_abs[i1]
@@ -287,6 +293,10 @@ class LibraryMicro(object):
                 self._nuclides[nuclide].load_from_h5(nuclide, fh=f)
 
         f.close()
+
+    def temp_dlt_interp_res_tbl(self, nuclide, temp, xs_dlt, ig):
+        return self._nuclides[nuclide].temp_dlt_interp_res_tbl(
+            temp, xs_dlt, ig)
 
     def anti_interp_res_tbl(self, nuclide, temp, ig, xs_abs=None, xs_tot=None,
                             xs_sca=None, xs_nfi=None):

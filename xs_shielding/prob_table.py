@@ -1,9 +1,54 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import numpy as np
+from copy import deepcopy
 from math import sqrt
 
 _NO_RESONANCE = 0.998
+
+
+def comp_sub_level(ig, pt, mglib, resnuc_xs, nuclide, temps, ave_temp,
+                   has_resfis=False):
+    # Number density adjustment method
+    jg = ig - mglib.first_res
+    pts = []
+    for itemp, temp in enumerate(temps):
+        pts.append(deepcopy(pt))
+        # Absorption
+        xs_dlt = mglib.anti_interp_res_tbl(
+            nuclide, ave_temp, ig,
+            xs_abs=resnuc_xs[nuclide]['xs_abs'][jg, itemp])
+        xs_abs = mglib.temp_dlt_interp_res_tbl(
+            nuclide, temp, xs_dlt, ig)['xs_abs']
+        f_abs = xs_abs / resnuc_xs[nuclide]['xs_abs'][jg, itemp]
+        pts[itemp]['sub_abs'] *= f_abs
+        # Total
+        xs_dlt = mglib.anti_interp_res_tbl(
+            nuclide, ave_temp, ig,
+            xs_tot=resnuc_xs[nuclide]['xs_tot'][jg, itemp])
+        xs_tot = mglib.temp_dlt_interp_res_tbl(
+            nuclide, temp, xs_dlt, ig)['xs_tot']
+        f_tot = xs_tot / resnuc_xs[nuclide]['xs_tot'][jg, itemp]
+        pts[itemp]['sub_tot'] *= f_tot
+        # Scatter
+        xs_dlt = mglib.anti_interp_res_tbl(
+            nuclide, ave_temp, ig,
+            xs_sca=resnuc_xs[nuclide]['xs_sca'][jg, itemp])
+        xs_sca = mglib.temp_dlt_interp_res_tbl(
+            nuclide, temp, xs_dlt, ig)['xs_sca']
+        f_sca = xs_sca / resnuc_xs[nuclide]['xs_sca'][jg, itemp]
+        pts[itemp]['sub_sca'] *= f_sca
+        if has_resfis:
+            # Production
+            xs_dlt = mglib.anti_interp_res_tbl(
+                nuclide, ave_temp, ig,
+                xs_nfi=resnuc_xs[nuclide]['xs_nfi'][jg, itemp])
+            xs_nfi = mglib.temp_dlt_interp_res_tbl(
+                nuclide, temp, xs_dlt, ig)['xs_nfi']
+            f_nfi = xs_nfi / resnuc_xs[nuclide]['xs_nfi'][jg, itemp]
+            pts[itemp]['sub_nfi'] *= f_nfi
+
+    return pts
 
 
 def adjust_sub_level(pts, rxs, has_resfis=False):
