@@ -110,6 +110,209 @@ class ResonancePinSubgroup(object):
         self._resnuc_xs = None
         self._n_res_reg = None
 
+    def solve_full_subgroup(self):
+        if self._pin_cell.ave_temp is None:
+            raise Exception('ave_temp of PinCell should be given')
+
+        # Set pin geometry
+        self._pin_solver.set_pin_geometry(self._pin_cell)
+
+        # Count number of resonant region
+        self._count_n_res_reg()
+
+        # Initialize subgroup macro xs
+        n_region = len(self._pin_cell.mat_fill)
+        mac_tot = np.zeros(n_region)
+        mac_sca = np.zeros(n_region)
+        mac_src = np.zeros(n_region)
+
+        # Initialize pseudo library at all temperatures
+        res_nuc = None
+        res_nuc_temps = []
+        for mat in self._pin_cell.materials:
+            for inuc, nuc in enumerate(mat.nuclides):
+                if self._micro_lib.has_res(nuc):
+                    res_nuc = nuc
+                    res_nuc_temps.append(mat.temperature)
+                    break
+        self._init_plib_one_nuc_multi_temp(res_nuc, 1.0, res_nuc_temps,
+                                           self._pin_cell.ave_temp)
+
+        # Initialize self-shielded xs. Xs for last region is pin averaged
+        # self-shielded xs
+        self._resnuc_xs = {}
+        self._resnuc_xs[res_nuc] = {}
+        self._init_self_shielded_xs()
+
+        if self._first_calc_g is None:
+            first_calc_g = self._micro_lib.first_res
+        else:
+            first_calc_g = self._first_calc_g
+        if self._last_calc_g is None:
+            last_calc_g = self._micro_lib.last_res
+        else:
+            last_calc_g = self._last_calc_g
+        for ig in range(first_calc_g, last_calc_g):
+            # Get subgroup parameters at all temperature
+            pt_ave, pts = self._pseudo_lib.get_subp_one_nuc(ig, res_nuc)
+            n_band = pt_ave['n_band']
+
+            print(ig, n_band)
+            if n_band > 1:
+                sub_flux = np.zeros((n_band, n_region))
+                for ib in range(n_band):
+                    mac_tot[:] = 0.0
+                    mac_sca[:] = 0.0
+                    mac_src[:] = 0.0
+                    for ireg in range(n_region):
+                        imat = self._pin_cell.mat_fill[ireg]
+                        mat = self._pin_cell.materials[imat]
+                        for inuc, nuc in enumerate(mat.nuclides):
+                            if nuc == res_nuc:
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pts[ireg]['sub_tot'][ib]
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pts[ireg]['sub_sca'][ib] * \
+                                    (1.0 - pts[ireg]['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    pts[ireg]['lambda'] * pts[ireg]['potential']
+                            else:
+                                xs_typ = self._micro_lib.get_typical_xs(
+                                    nuc, mat.temperature, ig, 'total',
+                                    'scatter', 'potential', 'lambda')
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] * xs_typ['total']
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] * xs_typ['scatter']\
+                                    * (1.0 - xs_typ['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    xs_typ['lambda'] * xs_typ['potential']
+
+                    # Solve subgroup fixed source equation and get volume
+                    # integrated flux
+                    self._pin_solver.set_pin_xs(xs_tot=mac_tot, xs_sca=mac_sca,
+                                                source=mac_src)
+                    self._pin_solver.solve()
+                    sub_flux[ib, :] = self._pin_solver.flux \
+                        * pt_ave['sub_wgt'][ib]
+
+                # Condense self-shielded xs
+                self._condense_self_shielded_xs(
+                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+
+    def solve_unify_sub_flx(self):
+        if self._pin_cell.ave_temp is None:
+            raise Exception('ave_temp of PinCell should be given')
+
+        # Set pin geometry
+        self._pin_solver.set_pin_geometry(self._pin_cell)
+
+        # Count number of resonant region
+        self._count_n_res_reg()
+
+        # Initialize subgroup macro xs
+        n_region = len(self._pin_cell.mat_fill)
+        mac_tot = np.zeros(n_region)
+        mac_sca = np.zeros(n_region)
+        mac_src = np.zeros(n_region)
+
+        # Initialize pseudo library at all temperatures
+        res_nuc = None
+        res_nuc_temps = []
+        for mat in self._pin_cell.materials:
+            for inuc, nuc in enumerate(mat.nuclides):
+                if self._micro_lib.has_res(nuc):
+                    res_nuc = nuc
+                    res_nuc_temps.append(mat.temperature)
+                    break
+        self._init_plib_one_nuc(res_nuc, 1.0, self._pin_cell.ave_temp)
+        self._init_plib_temp_as_nuc(res_nuc, 1.0, res_nuc_temps,
+                                    self._pin_cell.ave_temp)
+
+        # Whether has resonance fission
+        has_resfis = self._micro_lib.has_resfis(res_nuc)
+
+        # Initialize self-shielded xs. Xs for last region is pin averaged
+        # self-shielded xs
+        self._resnuc_xs = {}
+        self._resnuc_xs[res_nuc] = {}
+        self._init_self_shielded_xs()
+
+        if self._first_calc_g is None:
+            first_calc_g = self._micro_lib.first_res
+        else:
+            first_calc_g = self._first_calc_g
+        if self._last_calc_g is None:
+            last_calc_g = self._micro_lib.last_res
+        else:
+            last_calc_g = self._last_calc_g
+        for ig in range(first_calc_g, last_calc_g):
+            # Get subgroup parameters at all temperature
+            pt_ave = self._pseudo_lib.get_subp_one_nuc(ig, res_nuc)
+            pts = []
+            for itemp, temp in enumerate(res_nuc_temps):
+                plib = self._pseudo_libs[itemp]
+                pts.append(plib.get_subp_one_nuc(ig, res_nuc))
+            n_band = pt_ave['n_band']
+
+            print(ig, n_band)
+            if n_band > 1:
+                sub_flux = np.zeros((n_band, n_region))
+                for ib in range(n_band):
+                    mac_tot[:] = 0.0
+                    mac_sca[:] = 0.0
+                    mac_src[:] = 0.0
+                    for ireg in range(n_region):
+                        imat = self._pin_cell.mat_fill[ireg]
+                        mat = self._pin_cell.materials[imat]
+                        for inuc, nuc in enumerate(mat.nuclides):
+                            if nuc == res_nuc:
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pt_ave['sub_tot'][ib]
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pt_ave['sub_sca'][ib] * \
+                                    (1.0 - pt_ave['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    pt_ave['lambda'] * pt_ave['potential']
+                            else:
+                                xs_typ = self._micro_lib.get_typical_xs(
+                                    nuc, mat.temperature, ig, 'total',
+                                    'scatter', 'potential', 'lambda')
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] * xs_typ['total']
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] * xs_typ['scatter']\
+                                    * (1.0 - xs_typ['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    xs_typ['lambda'] * xs_typ['potential']
+
+                    # Solve subgroup fixed source equation and get volume
+                    # integrated flux
+                    self._pin_solver.set_pin_xs(xs_tot=mac_tot, xs_sca=mac_sca,
+                                                source=mac_src)
+                    self._pin_solver.solve()
+                    sub_flux[ib, :] = self._pin_solver.flux \
+                        * pt_ave['sub_wgt'][ib]
+
+                # Unify subgroup flux
+                pt_ave['sub_flx'] = sub_flux
+                pts.append(pt_ave)
+                unify_sub_wgt(pts, has_resfis)
+                sub_flux = pt_ave['sub_flx']
+                pts = pts[0:self._n_res_reg]
+
+                # Condense self-shielded xs
+                self._condense_self_shielded_xs(
+                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+
     def solve_comp_sub_level(self):
         # Solve problem at effective temperature
         if self.pin_cell_ave is None:
@@ -147,7 +350,8 @@ class ResonancePinSubgroup(object):
                 if self._micro_lib.has_res(nuc):
                     res_nuc = nuc
                     res_nuc_temps.append(mat.temperature)
-        self._init_pseudo_lib_one_nuc(res_nuc, 1.0, self._pin_cell.ave_temp)
+                    break
+        self._init_plib_one_nuc(res_nuc, 1.0, self._pin_cell.ave_temp)
 
         # Whether has resonance fission
         has_resfis = self._micro_lib.has_resfis(res_nuc)
@@ -250,8 +454,9 @@ class ResonancePinSubgroup(object):
                     res_nuc = nuc
                     res_nuc_dens = mat.densities[inuc]
                     res_nuc_temps.append(mat.temperature)
-        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps,
-                                         self._pin_cell.ave_temp)
+                    break
+        self._init_plib_temp_as_nuc(res_nuc, res_nuc_dens, res_nuc_temps,
+                                    self._pin_cell.ave_temp)
 
         # Whether has resonance fission
         has_resfis = self._micro_lib.has_resfis(res_nuc)
@@ -353,8 +558,9 @@ class ResonancePinSubgroup(object):
                     res_nuc = nuc
                     res_nuc_dens = mat.densities[inuc]
                     res_nuc_temps.append(mat.temperature)
-        self._init_plib_onenuc_multitemp(res_nuc, res_nuc_dens, res_nuc_temps,
-                                         self._pin_cell.ave_temp)
+                    break
+        self._init_plib_temp_as_nuc(res_nuc, res_nuc_dens, res_nuc_temps,
+                                    self._pin_cell.ave_temp)
 
         # Whether has resonance fission
         has_resfis = self._micro_lib.has_resfis(res_nuc)
@@ -400,6 +606,7 @@ class ResonancePinSubgroup(object):
                         mat = self._pin_cell.materials[imat]
                         if ireg < len(pts):
                             subp = pts[ireg]
+                            # print subp
                         for inuc, nuc in enumerate(mat.nuclides):
                             if nuc == res_nuc:
                                 mac_tot[ireg] \
@@ -462,7 +669,7 @@ class ResonancePinSubgroup(object):
 
         # Initialize pseudo library if needed
         if self._use_pseudo_lib:
-            self._init_pseudo_lib_one_nuc(res_nuc, res_nuc_dens, res_mat_temp)
+            self._init_plib_one_nuc(res_nuc, res_nuc_dens, res_mat_temp)
 
         # Initialize self-shielded xs. Xs for last region is pin averaged
         # self-shielded xs
@@ -534,8 +741,25 @@ class ResonancePinSubgroup(object):
                 self._condense_self_shielded_xs(
                     ig, res_nuc, sub_flux, self._pin_solver.vols, pt=subp)
 
-    def _init_plib_onenuc_multitemp(self, nuclide, density, temperatures,
-                                    ave_temp):
+    def _init_plib_one_nuc_multi_temp(self, nuclide, density, temperatures,
+                                      ave_temp):
+        if self._cross_sections is None:
+            raise Exception('cross_sections should be given')
+
+        # Input for library of pseudo nuclide
+        self._pseudo_lib = LibraryPseudo()
+        self._pseudo_lib.nuclides = [nuclide]
+        self._pseudo_lib.densities = [density]
+        self._pseudo_lib.temperature = ave_temp
+        self._pseudo_lib.temps = temperatures
+        self._pseudo_lib.cross_sections = self._cross_sections
+        self._pseudo_lib.mglib = self._micro_lib
+
+        # Make the library
+        self._pseudo_lib.make()
+
+    def _init_plib_temp_as_nuc(self, nuclide, density, temperatures,
+                               ave_temp):
         if self._cross_sections is None:
             raise Exception('cross_sections should be given')
 
@@ -552,7 +776,7 @@ class ResonancePinSubgroup(object):
             plib.make()
             self._pseudo_libs.append(plib)
 
-    def _init_pseudo_lib_one_nuc(self, nuclide, density, temperature):
+    def _init_plib_one_nuc(self, nuclide, density, temperature):
         if self._cross_sections is None:
             raise Exception('cross_sections should be given')
 
@@ -652,10 +876,6 @@ class ResonancePinSubgroup(object):
         if to_screen:
             for nuc in self._resnuc_xs:
                 print('nuclide', nuc)
-                # for ireg in range(n):
-                #     print('region', ireg)
-                #     for ig in range(n_res):
-                #         print(ig, self._resnuc_xs[nuc]['xs_abs'][ig, ireg])
                 print('pin averaged')
                 for ig in range(n_res):
                     print("%4i %f" %
@@ -668,11 +888,6 @@ class ResonancePinSubgroup(object):
                 f[nuc].create_group('regions')
                 f[nuc]['regions']['xs_abs'] \
                     = self._resnuc_xs[nuc]['xs_abs'][:, :self._n_res_reg]
-                for ireg in range(self._n_res_reg):
-                    reg = 'region%i' % ireg
-                    f[nuc].create_group(reg)
-                    f[nuc][reg]['xs_abs'] \
-                        = self._resnuc_xs[nuc]['xs_abs'][:, ireg]
                 f[nuc].create_group('average')
                 f[nuc]['average']['xs_abs'] \
                     = self._resnuc_xs[nuc]['xs_abs'][:, self._n_res_reg]

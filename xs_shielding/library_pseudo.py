@@ -1,17 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-""" brief description
-
-Author: Qingming He
-Email: he_qing_ming@foxmail.com
-Date: 2016-10-27 14:46:45
-
-Description
-===========
-
-
-"""
-from openmoc import SDSolver
+from openmoc import SDSolver, SDNuclide
 from openmoc.library_ce import LibraryCe
 import numpy as np
 from prob_table import ProbTable
@@ -31,6 +20,7 @@ class LibraryPseudo(object):
                            45.0, 50.0, 52.0, 60.0, 70.0, 80.0, 1e2, 2e2, 4e2,
                            6e2, 1e3, 1.2e3, 1e4, 1e10]
         self._n_dilution = len(self._dilutions)
+        self._temps = None
 
         self._n_nuclide = 0
         self._has_res_fis = False
@@ -94,6 +84,14 @@ class LibraryPseudo(object):
         self._mglib = mglib
 
     @property
+    def temps(self):
+        return self._temps
+
+    @temps.setter
+    def temps(self, temps):
+        self._temps = temps
+
+    @property
     def dilutions(self):
         return self._dilutions
 
@@ -123,6 +121,96 @@ class LibraryPseudo(object):
                 self._potential[jg] += self._ratios[inuc] * xs['potential']
 
     def make(self):
+        if self._temps is None:
+            self.make_ave_temp()
+        else:
+            self.make_multi_temps()
+
+    def make_multi_temps(self):
+        self._init_params()
+        mglib = self._mglib
+        n_temp = len(self._temps)
+
+        # Get energy boundaries for slowing down calculation
+        emax = mglib.group_boundaries[self._mglib.first_res]
+        emin = mglib.group_boundaries[self._mglib.last_res]
+
+        # Initialize slowing down solver
+        sd = SDSolver()
+        sd.setErgGrpBnd(
+            mglib.group_boundaries[mglib.first_res:mglib.last_res+1])
+        sd.setNumNuclide(self._n_nuclide + 1)
+        sd.setSolErgBnd(emin, emax)
+
+        # Initialize resonant nuclides of slowing down solver
+        for inuc, nuclide in enumerate(self._nuclides):
+            hflib = self._celib.get_nuclide(nuclide, self._temperature, emax,
+                                            emin, self._has_res_fis)
+            sdnuc = sd.getNuclide(inuc)
+            sdnuc.setName(nuclide)
+            sdnuc.setHFLibrary(hflib)
+            sdnuc.setNumDens(np.zeros(self._n_dilution) + self._ratios[inuc])
+
+        # Initialize background nuclide of slowing down solver
+        sdnuc = sd.getNuclide(self._n_nuclide)
+        sdnuc.setName('H1')
+        sdnuc.setAwr(0.9991673)
+        sdnuc.setPotential(1.0)
+        sdnuc.setNumDens(np.array(self._dilutions))
+
+        # Solve slowing down equation
+        sd.computeFlux()
+        sd.computeMgXs()
+
+        # Initialize resonance xs table
+        n_res = mglib.last_res - mglib.first_res
+        self._res_abs = np.zeros((n_res, self._n_nuclide+1, n_temp+1,
+                                  self._n_dilution))
+        self._res_sca = np.zeros((n_res, self._n_nuclide+1, n_temp+1,
+                                  self._n_dilution))
+        if self._has_res_fis:
+            self._res_nfi = np.zeros((n_res, self._n_nuclide+1, n_temp+1,
+                                      self._n_dilution))
+
+        # Obtain resonance xs table at all temperatures
+        for inuc, nuclide in enumerate(self._nuclides):
+            for itemp in range(n_temp+1):
+                if itemp == n_temp:
+                    temp = self._temperature
+                    sdnuc = sd.getNuclide(inuc)
+                else:
+                    temp = self._temps[itemp]
+                    hflib = self._celib.get_nuclide(
+                        nuclide, temp, emax, emin, self._has_res_fis)
+                    sdnuc = SDNuclide(nuclide)
+                    sdnuc.setHFLibrary(hflib)
+                    sdnuc.setNumDens(np.zeros(self._n_dilution) +
+                                     self._ratios[inuc])
+                    sd.computeMgXs(sdnuc)
+                for ig in range(mglib.first_res, mglib.last_res):
+                    jg = ig - mglib.first_res
+                    for idlt in range(self._n_dilution):
+                        xs_tot = sdnuc.getMgTotal(jg, idlt)
+                        self._res_sca[jg, inuc, itemp, idlt] \
+                            = sdnuc.getMgScatter(jg, idlt)
+                        self._res_abs[jg, inuc, itemp, idlt] \
+                            = xs_tot - self._res_sca[jg, inuc, itemp, idlt]
+                        if self._has_res_fis:
+                            xs_typ = mglib.get_typical_xs(
+                                nuclide, temp, ig, 'nu')
+                            self._res_nfi[jg, inuc, itemp, idlt] \
+                                = sdnuc.getMgFission(jg, idlt) * xs_typ['nu']
+
+            # Accumulate xs for pseudo nuclide
+            self._res_abs[:, self._n_nuclide, :, :] \
+                += self._res_abs[:, inuc, :, :] * self._ratios[inuc]
+            self._res_sca[:, self._n_nuclide, :, :] \
+                += self._res_sca[:, inuc, :, :] * self._ratios[inuc]
+            if self._has_res_fis:
+                self._res_nfi[:, self._n_nuclide, :, :] \
+                    += self._res_nfi[:, inuc, :, :] * self._ratios[inuc]
+
+    def make_ave_temp(self):
         self._init_params()
         mglib = self._mglib
 
@@ -168,17 +256,17 @@ class LibraryPseudo(object):
             jg = ig - mglib.first_res
             for inuc, nuclide in enumerate(self._nuclides):
                 sdnuc = sd.getNuclide(inuc)
-                for idil in range(self._n_dilution):
-                    xs_tot = sdnuc.getMgTotal(jg, idil)
-                    self._res_sca[jg, inuc, idil] \
-                        = sdnuc.getMgScatter(jg, idil)
-                    self._res_abs[jg, inuc, idil] \
-                        = xs_tot - self._res_sca[jg, inuc, idil]
+                for idlt in range(self._n_dilution):
+                    xs_tot = sdnuc.getMgTotal(jg, idlt)
+                    self._res_sca[jg, inuc, idlt] \
+                        = sdnuc.getMgScatter(jg, idlt)
+                    self._res_abs[jg, inuc, idlt] \
+                        = xs_tot - self._res_sca[jg, inuc, idlt]
                     if self._has_res_fis:
                         xs_typ = mglib.get_typical_xs(
                             nuclide, self._temperature, ig, 'nu')
-                        self._res_nfi[jg, inuc, idil] \
-                            = sdnuc.getMgFission(jg, idil) * xs_typ['nu']
+                        self._res_nfi[jg, inuc, idlt] \
+                            = sdnuc.getMgFission(jg, idlt) * xs_typ['nu']
                 # Accumulate xs for pseudo nuclide
                 self._res_abs[jg, self._n_nuclide, :] \
                     += self._res_abs[jg, inuc, :] * self._ratios[inuc]
@@ -188,40 +276,110 @@ class LibraryPseudo(object):
                     self._res_nfi[jg, self._n_nuclide, :] \
                         += self._res_nfi[jg, inuc, :] * self._ratios[inuc]
 
-    def get_res_tbl(self, ig, nuclide):
+    def get_res_tbl(self, ig, nuclide, itemp=None):
         jg = ig - self._mglib.first_res
         inuc = self._nuclides.index(nuclide)
-        res_abs = self._res_abs[jg, inuc, :]
-        res_sca = self._res_sca[jg, inuc, :]
-        res_tot = res_abs + res_sca
-        if self._has_res_fis:
-            res_nfi = self._res_nfi[jg, inuc, :]
+
+        if self._temps is None:
+            res_abs = self._res_abs[jg, inuc, :]
+            res_sca = self._res_sca[jg, inuc, :]
+            res_tot = res_abs + res_sca
+            if self._has_res_fis:
+                res_nfi = self._res_nfi[jg, inuc, :]
+            else:
+                res_nfi = None
         else:
-            res_nfi = None
+            if itemp is None:
+                raise Exception('itemp should be given')
+            res_abs = self._res_abs[jg, inuc, itemp, :]
+            res_sca = self._res_sca[jg, inuc, itemp, :]
+            res_tot = res_abs + res_sca
+            if self._has_res_fis:
+                res_nfi = self._res_nfi[jg, inuc, itemp, :]
+            else:
+                res_nfi = None
+
         return {'res_tot': res_tot, 'res_abs': res_abs, 'res_sca': res_sca,
-                'res_nfi': res_nfi, 'dilutions': self._dilutions,
-                'lambda': self._gc_factor[jg], 'potential': self._potential[jg]}
+                'res_nfi': res_nfi, 'dilutions': self._dilutions, 'lambda':
+                self._gc_factor[jg], 'potential': self._potential[jg]}
 
     def get_subp_one_nuc(self, ig, nuclide):
         mglib = self._mglib
         jg = ig - mglib.first_res
         inuc = self._nuclides.index(nuclide)
 
-        # Fit subgroup parameters
-        pt = ProbTable()
-        pt.gc_factor = self._gc_factor[jg]
-        pt.potential = self._potential[jg]
-        pt.dilutions = self._dilutions
-        pt.xs_abs = self._res_abs[jg, inuc, :]
-        pt.xs_sca = self._res_sca[jg, inuc, :]
-        if self._has_res_fis:
-            pt.xs_nfi = self._res_nfi[jg, inuc, :]
-        pt.fit()
+        if self._temps is None:
+            # Fit subgroup parameters
+            pt = ProbTable()
+            pt.gc_factor = self._gc_factor[jg]
+            pt.potential = self._potential[jg]
+            pt.dilutions = self._dilutions
+            pt.xs_abs = self._res_abs[jg, inuc, :]
+            pt.xs_sca = self._res_sca[jg, inuc, :]
+            if self._has_res_fis:
+                pt.xs_nfi = self._res_nfi[jg, inuc, :]
+            pt.fit()
 
-        return {'lambda': pt.gc_factor, 'potential': pt.potential, 'sub_tot':
-                pt.sub_tot, 'sub_abs': pt.sub_abs, 'sub_sca': pt.sub_sca,
-                'sub_nfi': pt.sub_nfi, 'sub_wgt': pt.sub_wgt, 'n_band':
-                pt.n_band}
+            return {'lambda': pt.gc_factor, 'potential': pt.potential,
+                    'sub_tot': pt.sub_tot, 'sub_abs': pt.sub_abs, 'sub_sca':
+                    pt.sub_sca, 'sub_nfi': pt.sub_nfi, 'sub_wgt': pt.sub_wgt,
+                    'n_band': pt.n_band}
+
+        else:
+            n_temp = len(self._temps)
+            pt = ProbTable()
+            pt.gc_factor = self._gc_factor[jg]
+            pt.potential = self._potential[jg]
+            pt.dilutions = self._dilutions
+            pt.xs_abs = self._res_abs[jg, inuc, n_temp, :]
+            pt.xs_sca = self._res_sca[jg, inuc, n_temp, :]
+            if self._has_res_fis:
+                pt.xs_nfi = self._res_nfi[jg, inuc, n_temp, :]
+            if self._has_res_fis:
+                n_xxx = 4
+            else:
+                n_xxx = 3
+            xs_xxx = np.zeros((n_temp * n_xxx, self._n_dilution))
+            i = 0
+            check_xxx_idx = []
+            for itemp in range(n_temp):
+                xs_xxx[i, :] = self._res_abs[jg, inuc, itemp, :]
+                xs_xxx[i+1, :] = self._res_sca[jg, inuc, itemp, :]
+                xs_xxx[i+2, :] = xs_xxx[i, :] + xs_xxx[i+1, :]
+                if self._has_res_fis:
+                    xs_xxx[i+3, :] = self._res_nfi[jg, inuc, itemp, :]
+                check_xxx_idx.extend([i+1, i+2])
+                i += n_xxx
+            pt.xs_xxx = xs_xxx
+            pt.check_xxx_idx = check_xxx_idx
+            pt.fit()
+
+            pt_ave = {}
+            pt_ave['lambda'] = pt.gc_factor
+            pt_ave['potential'] = pt.potential
+            pt_ave['sub_tot'] = pt.sub_tot
+            pt_ave['sub_abs'] = pt.sub_abs
+            pt_ave['sub_sca'] = pt.sub_sca
+            pt_ave['sub_nfi'] = pt.sub_nfi
+            pt_ave['sub_wgt'] = pt.sub_wgt
+            pt_ave['n_band'] = pt.n_band
+            pts = []
+            i = 0
+            for itemp in range(n_temp):
+                pts.append({})
+                pts[itemp]['lambda'] = pt.gc_factor
+                pts[itemp]['potential'] = pt.potential
+                pts[itemp]['n_band'] = pt.n_band
+                if pt.n_band > 1:
+                    pts[itemp]['sub_wgt'] = pt.sub_wgt
+                    pts[itemp]['sub_abs'] = pt.sub_xxx[i, :]
+                    pts[itemp]['sub_sca'] = pt.sub_xxx[i+1, :]
+                    pts[itemp]['sub_tot'] = pt.sub_xxx[i+2, :]
+                    if self._has_res_fis:
+                        pts[itemp]['sub_nfi'] = pt.sub_xxx[i+3, :]
+                i += n_xxx
+
+            return pt_ave, pts
 
 if __name__ == '__main__':
     fname = os.path.join(os.getenv('HOME'),

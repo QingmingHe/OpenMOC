@@ -9,6 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
 
+_MICROMGLIB = os.path.join(os.getenv('HOME'),
+                           'Dropbox/work/codes/openmoc/micromgxs',
+                           'jeff-3.2-wims69e.h5')
+
 
 def plot_adjust_sub_level():
 
@@ -21,15 +25,12 @@ def plot_adjust_sub_level():
     alltemps = deepcopy(temps)
     alltemps.append(ave_temp)
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
-    ig = 20
+    ig = 15
     savefig = 'adjust_level_error_%i.png' % (ig+1)
 
     # Load micro library
-    mglibf = os.path.join(os.getenv('HOME'),
-                          'Dropbox/work/codes/openmc/openmc/micromgxs',
-                          'jeff-3.2-wims69e.h5')
     mglib = LibraryMicro()
-    mglib.load_from_h5(mglibf)
+    mglib.load_from_h5(_MICROMGLIB)
 
     pts = []
     rxs = []
@@ -73,11 +74,8 @@ def test_975():
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
     # Load micro library
-    fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
-    lib.load_from_h5(fname)
+    lib.load_from_h5(_MICROMGLIB)
     # Define a pin cell
     pin = PinCell()
     pin.pin_type = PINCELLBOX
@@ -137,11 +135,8 @@ def test_comp_level():
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
     # Load micro library
-    fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
-    lib.load_from_h5(fname)
+    lib.load_from_h5(_MICROMGLIB)
     # Define a pin cell
     pin = PinCell()
     pin.pin_type = PINCELLBOX
@@ -194,7 +189,7 @@ def test_comp_level():
     sub.print_self_shielded_xs(to_h5='simple-pin-comp.h5', to_screen=True)
 
 
-def test_unify():
+def test_unify_sub_flx():
     # OpenMC cross sections
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
     # Define materials
@@ -221,11 +216,8 @@ def test_unify():
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
     # Load micro library
-    fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
-    lib.load_from_h5(fname)
+    lib.load_from_h5(_MICROMGLIB)
     # Define a pin cell
     pin = PinCell()
     pin.pin_type = PINCELLBOX
@@ -254,8 +246,130 @@ def test_unify():
     sub.micro_lib = lib
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
+    sub.solve_unify_sub_flx()
+    sub.print_self_shielded_xs(to_h5='simple-pin-unify-flx.h5', to_screen=True)
+
+
+def test_full_subgroup():
+    # OpenMC cross sections
+    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
+    # Define materials
+    fuel0 = Material(temperature=1190.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel0')
+    fuel1 = Material(temperature=1140.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel1')
+    fuel2 = Material(temperature=1100.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel2')
+    fuel3 = Material(temperature=1060.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel3')
+    fuel4 = Material(temperature=1010.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel4')
+    fuel5 = Material(temperature=970.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel5')
+    fuel6 = Material(temperature=930.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel6')
+    fuel7 = Material(temperature=890.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel7')
+    fuel8 = Material(temperature=860.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel8')
+    fuel9 = Material(temperature=820.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel9')
+    mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
+                   name='moderator')
+    # Load micro library
+    lib = LibraryMicro()
+    lib.load_from_h5(_MICROMGLIB)
+    # Define a pin cell
+    pin = PinCell()
+    pin.pin_type = PINCELLBOX
+    pin.pitch = 1.26
+    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
+                     fuel8, fuel9, mod]
+    pin.radii = [
+        0.129653384067,
+        0.183357574155,
+        0.224566248577,
+        0.259306768134,
+        0.289913780286,
+        0.317584634389,
+        0.343030610879,
+        0.36671514831,
+        0.388960152201,
+        0.41
+    ]
+    pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    pin.ave_temp = 975.0
+    # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
+    sub = ResonancePinSubgroup()
+    sub.pin_cell = pin
+    sub.pin_solver = PinFixSolver()
+    sub.pin_solver.n_ring_fuel = 20
+    sub.micro_lib = lib
+    sub.cross_sections = cross_sections
+    sub.use_pseudo_lib = True
+    sub.solve_full_subgroup()
+    sub.print_self_shielded_xs(to_h5='simple-pin-full-subgroup.h5', to_screen=True)
+
+
+def test_unify_sub_wgt():
+    # OpenMC cross sections
+    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
+    # Define materials
+    fuel0 = Material(temperature=1190.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel0')
+    fuel1 = Material(temperature=1140.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel1')
+    fuel2 = Material(temperature=1100.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel2')
+    fuel3 = Material(temperature=1060.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel3')
+    fuel4 = Material(temperature=1010.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel4')
+    fuel5 = Material(temperature=970.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel5')
+    fuel6 = Material(temperature=930.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel6')
+    fuel7 = Material(temperature=890.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel7')
+    fuel8 = Material(temperature=860.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel8')
+    fuel9 = Material(temperature=820.0, nuclides=['U238'],
+                     densities=[2.21546e-2], name='fuel9')
+    mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
+                   name='moderator')
+    # Load micro library
+    lib = LibraryMicro()
+    lib.load_from_h5(_MICROMGLIB)
+    # Define a pin cell
+    pin = PinCell()
+    pin.pin_type = PINCELLBOX
+    pin.pitch = 1.26
+    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
+                     fuel8, fuel9, mod]
+    pin.radii = [
+        0.129653384067,
+        0.183357574155,
+        0.224566248577,
+        0.259306768134,
+        0.289913780286,
+        0.317584634389,
+        0.343030610879,
+        0.36671514831,
+        0.388960152201,
+        0.41
+    ]
+    pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    pin.ave_temp = 975.0
+    # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
+    sub = ResonancePinSubgroup()
+    sub.pin_cell = pin
+    sub.pin_solver = PinFixSolver()
+    sub.pin_solver.n_ring_fuel = 20
+    sub.micro_lib = lib
+    sub.cross_sections = cross_sections
+    sub.use_pseudo_lib = True
     sub.solve_unify_sub_wgt()
-    sub.print_self_shielded_xs(to_h5='simple-pin-unify.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-unify-wgt.h5', to_screen=True)
 
 
 def test_adjust_level():
@@ -285,11 +399,8 @@ def test_adjust_level():
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
     # Load micro library
-    fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
-                         'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
-    lib.load_from_h5(fname)
+    lib.load_from_h5(_MICROMGLIB)
     # Define a pin cell
     pin = PinCell()
     pin.pin_type = PINCELLBOX
@@ -310,7 +421,7 @@ def test_adjust_level():
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     pin.ave_temp = 975.0
-    # sub = ResonancePinSubgroup(first_calc_g=23, last_calc_g=24)
+    # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
     sub.pin_solver = PinFixSolver()
@@ -327,6 +438,8 @@ if __name__ == '__main__':
     # $ ... -s 0.005 -a 256
     # test_975()
     # test_adjust_level()
-    # test_unify()
-    test_comp_level()
+    test_full_subgroup()
+    # test_unify_sub_wgt()
+    # test_unify_sub_flx()
+    # test_comp_level()
     # plot_adjust_sub_level()

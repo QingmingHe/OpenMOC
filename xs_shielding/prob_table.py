@@ -100,9 +100,9 @@ def adjust_sub_level(pts, rxs, has_resfis=False):
 
 def _remove_dup(unif_acc):
     idx = []
-    for i in range(1, len(unif_acc)):
+    for i in range(len(unif_acc)):
         val = unif_acc[i]
-        for j in range(i):
+        for j in range(i+1, len(unif_acc)):
             if abs(val - unif_acc[j]) < 1e-13:
                 idx.append(j)
     acc = []
@@ -143,6 +143,9 @@ def unify_sub_wgt(pts, has_resfis=False):
             sub_abs = np.zeros(n_band)
             sub_sca = np.zeros(n_band)
             sub_nfi = np.zeros(n_band)
+            if 'sub_flx' in pt:
+                n_region = pt['sub_flx'].shape[1]
+                sub_flx = np.zeros((n_band, n_region))
             ib0 = 0
             ib1 = 0
             while True:
@@ -151,6 +154,9 @@ def unify_sub_wgt(pts, has_resfis=False):
                 sub_sca[ib1] = pt['sub_sca'][ib0]
                 if has_resfis:
                     sub_nfi[ib1] = pt['sub_nfi'][ib0]
+                if 'sub_flx' in pt:
+                    sub_flx[ib1, :] = pt['sub_flx'][ib0, :] * unif_wgt[ib1] \
+                        / pt['sub_wgt'][ib0]
 
                 if abs(wgts_acc[i][ib0] - unif_acc[ib1]) < 1e-13:
                     ib0 += 1
@@ -169,6 +175,8 @@ def unify_sub_wgt(pts, has_resfis=False):
             pt['sub_wgt'] = unif_wgt
             if has_resfis:
                 pt['sub_nfi'] = sub_nfi
+            if 'sub_flx' in pt:
+                pt['sub_flx'] = sub_flx
 
     return n_band
 
@@ -183,6 +191,9 @@ class ProbTable(object):
         self._xs_abs = None
         self._xs_sca = None
         self._xs_nfi = None
+        self._n_xxx = 0
+        self._xs_xxx = None
+        self._check_xxx_idx = []
 
         # Parameters to be calculated
         self._xs_tot = None
@@ -193,6 +204,7 @@ class ProbTable(object):
         self._sub_sca = None
         self._sub_nfi = None
         self._sub_wgt = None
+        self._sub_xxx = None
 
     def fit(self, n_band_begin=2, n_band_end=7):
         # Calculate total xs from absorb and scatter
@@ -205,6 +217,7 @@ class ProbTable(object):
         sub_sca = {}
         sub_abs = {}
         sub_nfi = {}
+        sub_xxx = {}
 
         # Check whether has resonance
         if self._xs_abs[0] / self._xs_abs[-1] >= _NO_RESONANCE:
@@ -221,17 +234,35 @@ class ProbTable(object):
 
             # Fit based on IR model
             sub_int[n_band], sub_wgt[n_band], sub_tot[n_band], \
-                sub_sca[n_band], sub_abs[n_band], sub_nfi[n_band] \
+                sub_sca[n_band], sub_abs[n_band], sub_nfi[n_band], \
+                sub_xxx[n_band] \
                 = self._fit_ir(n_band, idx0, idx1, backgrounds0, backgrounds1)
 
             # Check stability of subgroup parameters
             stable = True
-            for ib in range(n_band):
-                if sub_tot[n_band][ib] <= 0.0 or sub_sca[n_band][ib] <= 0.0 \
-                   or sub_wgt[n_band][ib] <= 0.0 or sub_wgt[n_band][ib] >= 1.0 \
-                   or sub_sca[n_band][ib] > 2.0 * sub_tot[n_band][ib]:
-                    stable = False
-                    break
+            if self._xs_xxx is None:
+                for ib in range(n_band):
+                    if sub_tot[n_band][ib] <= 0.0 \
+                       or sub_sca[n_band][ib] <= 0.0 \
+                       or sub_wgt[n_band][ib] <= 0.0 \
+                       or sub_wgt[n_band][ib] >= 1.0 \
+                       or sub_sca[n_band][ib] > sub_tot[n_band][ib]:
+                        stable = False
+                        break
+            else:
+                for ib in range(n_band):
+                    if sub_tot[n_band][ib] <= 0.0 \
+                       or sub_sca[n_band][ib] <= 0.0 \
+                       or sub_wgt[n_band][ib] <= 0.0 \
+                       or sub_wgt[n_band][ib] >= 1.0 \
+                       or sub_sca[n_band][ib] > 1.0 * sub_tot[n_band][ib]:
+                        stable = False
+                    for ix in self._check_xxx_idx:
+                        if sub_xxx[n_band][ix, ib] <= 0:
+                            stable = False
+                            break
+                    if not stable:
+                        break
 
             # Calculate fit error
             if stable:
@@ -254,6 +285,8 @@ class ProbTable(object):
             self._sub_wgt = sub_wgt[min_rms_n_band]
             if self._xs_nfi is not None:
                 self._sub_nfi = sub_nfi[min_rms_n_band]
+            if self._xs_xxx is not None:
+                self._sub_xxx = sub_xxx[min_rms_n_band]
 
     def _fit_ir(self, n_band, idx0, idx1, backgrounds0, backgrounds1):
         n_back0 = len(backgrounds0)
@@ -270,6 +303,8 @@ class ProbTable(object):
         xs_abs1 = np.zeros(n_back1)
         if self._xs_nfi is not None:
             xs_nfi1 = np.zeros(n_back1)
+        if self._xs_xxx is not None:
+            xs_xxx1 = np.zeros((self._n_xxx, n_back1))
         for i in range(n_back0):
             xs_int0[i] = xs_int[idx0[i]]
         for i in range(n_back1):
@@ -278,6 +313,9 @@ class ProbTable(object):
             xs_abs1[i] = self._xs_abs[idx1[i]]
             if self._xs_nfi is not None:
                 xs_nfi1[i] = self._xs_nfi[idx1[i]]
+            if self._xs_xxx is not None:
+                for j in range(self._n_xxx):
+                    xs_xxx1[j, i] = self._xs_xxx[j, idx1[i]]
 
         # Get xs at infinite background
         xs_int_inf = xs_int[-1]
@@ -286,6 +324,10 @@ class ProbTable(object):
         xs_abs_inf = self._xs_abs[-1]
         if self._xs_nfi is not None:
             xs_nfi_inf = self._xs_nfi[-1]
+        if self._xs_xxx is not None:
+            xs_xxx_inf = np.zeros(self._n_xxx)
+            for i in range(self._n_xxx):
+                xs_xxx_inf[i] = self._xs_xxx[i, -1]
 
         # Calculate c and d
         c, d = _calc_c_d_coeff(xs_int0, xs_int_inf, backgrounds0, n_band)
@@ -308,7 +350,15 @@ class ProbTable(object):
             sub_nfi = _calc_sub_x(xs_nfi1, xs_nfi_inf, sub_int, d,
                                   backgrounds1)
 
-        return sub_int, sub_wgt, sub_tot, sub_sca, sub_abs, sub_nfi
+        # Calculate subgroup xs of xxx type
+        sub_xxx = None
+        if self._xs_xxx is not None:
+            sub_xxx = np.zeros((self._n_xxx, n_band))
+            for i in range(self._n_xxx):
+                sub_xxx[i, :] = _calc_sub_x(xs_xxx1[i, :], xs_xxx_inf[i],
+                                            sub_int, d, backgrounds1)
+
+        return sub_int, sub_wgt, sub_tot, sub_sca, sub_abs, sub_nfi, sub_xxx
 
     @property
     def gc_factor(self):
@@ -359,6 +409,23 @@ class ProbTable(object):
         self._xs_nfi = xs_nfi
 
     @property
+    def check_xxx_idx(self):
+        return self._check_xxx_idx
+
+    @check_xxx_idx.setter
+    def check_xxx_idx(self, check_xxx_idx):
+        self._check_xxx_idx = check_xxx_idx
+
+    @property
+    def xs_xxx(self):
+        return self._xs_xxx
+
+    @xs_xxx.setter
+    def xs_xxx(self, xs_xxx):
+        self._n_xxx = xs_xxx.shape[0]
+        self._xs_xxx = xs_xxx
+
+    @property
     def xs_tot(self):
         return self._xs_tot
 
@@ -389,6 +456,10 @@ class ProbTable(object):
     @property
     def has_prob_table(self):
         return self._has_prob_table
+
+    @property
+    def sub_xxx(self):
+        return self._sub_xxx
 
 
 def _find_nearest_array(array0, array1):

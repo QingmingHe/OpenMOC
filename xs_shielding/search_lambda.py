@@ -50,7 +50,7 @@ def search_lambda():
 
     # Load micro library
     fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
+                         'Dropbox/work/codes/openmoc/micromgxs',
                          'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)
@@ -87,7 +87,9 @@ def search_lambda():
 
     # Search lambda for each group
     gc_factors = np.zeros(lib.last_res - lib.first_res)
-    for ig in range(lib.first_res, lib.last_res):
+    first_calc_g = 18
+    last_calc_g = 20
+    for ig in range(first_calc_g, last_calc_g):
         print("searching group %i ..." % (ig))
         jg = ig - lib.first_res
         min_xs_abs = _solve_pin(res_nuc, ig, pin, lib, 0.0, cross_sections)
@@ -114,4 +116,6 @@ def search_lambda():
     print gc_factors
 
 if __name__ == '__main__':
+    # Run with
+    # $ ./search_lambda.py -s 0.005 -a 256
     search_lambda()
