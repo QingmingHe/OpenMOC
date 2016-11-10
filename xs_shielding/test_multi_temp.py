@@ -186,7 +186,8 @@ def test_adjust_numdens():
     sub.use_pseudo_lib = True
     sub.pin_cell_ave = pin_ave
     sub.solve_adjust_numdens()
-    sub.print_self_shielded_xs(to_h5='simple-pin-comp.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-adjust-numdens.h5',
+                               to_screen=True)
 
 
 def test_correlation_variant():
@@ -247,7 +248,8 @@ def test_correlation_variant():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_correlation_variant()
-    sub.print_self_shielded_xs(to_h5='simple-pin-unify-flx.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-correlation-var.h5',
+                               to_screen=True)
 
 
 def test_partial_xs_fit_var():
@@ -308,7 +310,8 @@ def test_partial_xs_fit_var():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_partial_xs_fit_var()
-    sub.print_self_shielded_xs(to_h5='simple-pin-full-subgroup.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-partial-xs-fit-var.h5',
+                               to_screen=True)
 
 
 def test_partial_xs_fit():
@@ -369,7 +372,8 @@ def test_partial_xs_fit():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_partial_xs_fit()
-    sub.print_self_shielded_xs(to_h5='simple-pin-full-subgroup.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-partial-xs-fit.h5',
+                               to_screen=True)
 
 
 def test_correlation():
@@ -430,7 +434,8 @@ def test_correlation():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_correlation()
-    sub.print_self_shielded_xs(to_h5='simple-pin-unify-wgt.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-correlation.h5',
+                               to_screen=True)
 
 
 def test_adjust_level():
@@ -491,7 +496,8 @@ def test_adjust_level():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_adjust_sub_level()
-    sub.print_self_shielded_xs(to_h5='simple-pin-adjust.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-adjust-level.h5',
+                               to_screen=True)
 
 
 if __name__ == '__main__':
