@@ -7,6 +7,8 @@ project(openmoc CXX)
 option(double_fp "Enable double precision" OFF)
 option(root_install "Install openmoc for root user" OFF)
 option(debug "Enable debug mode" OFF)
+option(profile "Enable profile mode" OFF)
+option(cuda "Compile openmoc.cuda module with nvcc compiler" OFF)
 
 #===============================================================================
 # Find SWIG package
@@ -120,6 +122,32 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL Intel)
     src/Matrix.cpp
     src/linalg.cpp)
 
+else(CMAKE_CXX_COMPILER_ID STREQUAL XL)
+
+  set(cpp_source
+    src/Cell.cpp
+    src/Geometry.cpp
+    src/LocalCoords.cpp
+    src/log.cpp
+    src/Material.cpp
+    src/MOCKernel.cpp
+    src/Point.cpp
+    src/Quadrature.cpp
+    src/ExpEvaluator.cpp
+    src/Solver.cpp
+    src/CPUSolver.cpp
+    src/Surface.cpp
+    src/Timer.cpp
+    src/Track.cpp
+    src/TrackGenerator.cpp
+    src/TrackTraversingAlgorithms.cpp
+    src/TraverseTracks.cpp
+    src/Universe.cpp
+    src/Cmfd.cpp
+    src/Vector.cpp
+    src/Matrix.cpp
+    src/linalg.cpp)
+
 endif()
 
 #===============================================================================
@@ -157,6 +185,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
     list(APPEND cxxflags -g)
   endif()
 
+  if(profile)
+    list(APPEND cxxflags -pg)
+    if(NOT debug)
+      list(APPEND cxxflags -g)
+    endif()
+  endif()
+
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
 
   list(APPEND cxxflags -ffast-math -O3 -fopenmp -std=c++11 -fpic -Qunused-arguments
@@ -176,6 +211,13 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
 
   if(debug)
     list(APPEND cxxflags -g)
+  endif()
+
+  if(profile)
+    list(APPEND cxxflags -pg)
+    if(NOT debug)
+      list(APPEND cxxflags -g)
+    endif()
   endif()
 
 else(CMAKE_CXX_COMPILER_ID STREQUAL Intel)
@@ -199,6 +241,41 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL Intel)
     list(APPEND cxxflags -g)
   endif()
 
+  if(profile)
+    list(APPEND cxxflags -pg)
+    if(NOT debug)
+      list(APPEND cxxflags -g)
+    endif()
+  endif()
+
+else(CMAKE_CXX_COMPILER_ID STREQUAL XL)
+
+  list(APPEND cxxflags -O2 -qarch=qp -qreport -qsimd=auto -qtune=qp -qunroll=auto
+    -qsmp=omp -qpic)
+  list(APPEND cxxflags -DBGXLC -DOPENMP -DSWIG -DVEC_LENGTH=${vec_length}
+    -DVEC_ALIGNMENT=${vec_alignment})
+  list(APPEND swigflags -DBGXLC)
+  list(APPEND ldflags -qmkshrobj -R/soft/compilers/ibmcmp-may2013/lib64/bg/bglib64)
+
+  if(double_fp)
+    list(APPEND cxxflags -DDOUBLE -DFP_PRECISION=double)
+    list(APPEND swigflags -DDOUBLE -DFP_PRECISION=double)
+  else()
+    list(APPEND cxxflags -DSINGLE -DFP_PRECISION=float)
+    list(APPEND swigflags -DSINGLE -DFP_PRECISION=float)
+  endif()
+
+  if(debug)
+    list(APPEND cxxflags -g)
+  endif()
+
+  if(profile)
+    list(APPEND cxxflags -pg)
+    if(NOT debug)
+      list(APPEND cxxflags -g)
+    endif()
+  endif()
+
 endif()
 
 #===============================================================================
@@ -216,9 +293,14 @@ set_source_files_properties(${PROJECT_NAME}/${PROJECT_NAME}.i
   SWIG_FLAGS "${swigflags}"
   )
 
+# Make openmoc directory under current binary path
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME})
+
+# Add openmoc module
 swig_add_module(${PROJECT_NAME} python
   ${PROJECT_NAME}/${PROJECT_NAME}.i ${cpp_source})
+
+# Link to Python libraries
 swig_link_libraries(${PROJECT_NAME} ${PythonLibs})
 
 # Set target CXX compile flags
