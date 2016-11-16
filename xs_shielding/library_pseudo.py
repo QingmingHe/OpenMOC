@@ -21,6 +21,7 @@ class LibraryPseudo(object):
                            6e2, 1e3, 1.2e3, 1e4, 1e10]
         self._n_dilution = len(self._dilutions)
         self._temps = None
+        self._find_nearest_temp = False
 
         self._n_nuclide = 0
         self._has_res_fis = False
@@ -40,6 +41,15 @@ class LibraryPseudo(object):
     def nuclides(self, nuclides):
         self._nuclides = nuclides
         self._n_nuclide = len(nuclides)
+
+    @property
+    def find_nearest_temps(self):
+        return self._find_nearest_temps
+
+    @find_nearest_temps.setter
+    def find_nearest_temps(self, find_nearest_temps):
+        self._find_nearest_temps = find_nearest_temps
+        self._n_find_nearest_temp = len(find_nearest_temps)
 
     @property
     def densities(self):
@@ -144,8 +154,9 @@ class LibraryPseudo(object):
 
         # Initialize resonant nuclides of slowing down solver
         for inuc, nuclide in enumerate(self._nuclides):
-            hflib = self._celib.get_nuclide(nuclide, self._temperature, emax,
-                                            emin, self._has_res_fis)
+            hflib = self._celib.get_nuclide(
+                nuclide, self._temperature, emax, emin, self._has_res_fis,
+                find_nearest_temp=self._find_nearest_temp)
             sdnuc = sd.getNuclide(inuc)
             sdnuc.setName(nuclide)
             sdnuc.setHFLibrary(hflib)
@@ -181,7 +192,8 @@ class LibraryPseudo(object):
                 else:
                     temp = self._temps[itemp]
                     hflib = self._celib.get_nuclide(
-                        nuclide, temp, emax, emin, self._has_res_fis)
+                        nuclide, temp, emax, emin, self._has_res_fis,
+                        find_nearest_temp=self._find_nearest_temp)
                     sdnuc = SDNuclide(nuclide)
                     sdnuc.setHFLibrary(hflib)
                     sdnuc.setNumDens(np.zeros(self._n_dilution) +
@@ -210,6 +222,8 @@ class LibraryPseudo(object):
                 self._res_nfi[:, self._n_nuclide, :, :] \
                     += self._res_nfi[:, inuc, :, :] * self._ratios[inuc]
 
+        del sd
+
     def make_ave_temp(self):
         self._init_params()
         mglib = self._mglib
@@ -227,8 +241,9 @@ class LibraryPseudo(object):
 
         # Initialize resonant nuclides of slowing down solver
         for inuc, nuclide in enumerate(self._nuclides):
-            hflib = self._celib.get_nuclide(nuclide, self._temperature, emax,
-                                            emin, self._has_res_fis)
+            hflib = self._celib.get_nuclide(
+                nuclide, self._temperature, emax, emin, self._has_res_fis,
+                find_nearest_temp=self._find_nearest_temp)
             sdnuc = sd.getNuclide(inuc)
             sdnuc.setName(nuclide)
             sdnuc.setHFLibrary(hflib)
@@ -275,6 +290,8 @@ class LibraryPseudo(object):
                 if self._has_res_fis:
                     self._res_nfi[jg, self._n_nuclide, :] \
                         += self._res_nfi[jg, inuc, :] * self._ratios[inuc]
+
+        del sd
 
     def get_res_tbl(self, ig, nuclide, itemp=None):
         jg = ig - self._mglib.first_res

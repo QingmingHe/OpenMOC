@@ -109,6 +109,166 @@ class ResonancePinSubgroup(object):
         self._pseudo_libs = None
         self._resnuc_xs = None
         self._n_res_reg = None
+        self._flux = None
+        self._n_band = None
+        self._partial_xs_preserve_reaction = True
+
+    def _solve_partial_xs_ave_temp(self, ave_temp, ig):
+        solver = ResonancePinSubgroup()
+        pin_cell = deepcopy(self._pin_cell)
+        pin_cell.ave_temp = ave_temp
+        solver.pin_cell = pin_cell
+        solver.pin_solver = self.pin_solver
+        solver.micro_lib = self.micro_lib
+        solver.use_pseudo_lib = self.use_pseudo_lib
+        solver.cross_sections = self.cross_sections
+        solver.first_calc_g = ig
+        solver.last_calc_g = ig + 1
+        solver.solve_partial_xs_fit()
+
+        res_nuc = solver.resnuc_xs.keys()[0]
+        jg = ig - self._micro_lib.first_res
+        if self._partial_xs_preserve_reaction:
+            reaction = np.sum(
+                solver.resnuc_xs[res_nuc]['xs_abs'][jg, 0:self._n_res_reg] *
+                solver.flux[jg, 0:self._n_res_reg])
+        else:
+            reaction = solver.resnuc_xs[res_nuc]['xs_abs'][jg, -1]
+        return (reaction, solver.resnuc_xs[res_nuc]['xs_abs'][jg, :],
+                solver.flux[jg, :])
+
+    def solve_partial_xs_fit_new(self):
+        # Solve problem at effective temperature
+        if self.pin_cell_ave is None:
+            raise Exception('pin_cell_ave should be given')
+        ave_solver = ResonancePinSubgroup()
+        ave_solver.pin_cell = self.pin_cell_ave
+        ave_solver.pin_solver = self.pin_solver
+        ave_solver.micro_lib = self.micro_lib
+        ave_solver.use_pseudo_lib = self.use_pseudo_lib
+        ave_solver.cross_sections = self.cross_sections
+        ave_solver.first_calc_g = self.first_calc_g
+        ave_solver.last_calc_g = self.last_calc_g
+        ave_solver.solve_onenuc_onetemp()
+
+        # Set pin geometry
+        self._pin_solver.set_pin_geometry(self._pin_cell)
+
+        # Count number of resonant region
+        self._count_n_res_reg()
+
+        # Get resonant nuclide and temperatures
+        res_nuc = None
+        res_nuc_temps = []
+        for mat in self._pin_cell.materials:
+            for inuc, nuc in enumerate(mat.nuclides):
+                if self._micro_lib.has_res(nuc):
+                    res_nuc = nuc
+                    res_nuc_temps.append(mat.temperature)
+                    break
+
+        # Initialize self-shielded xs. Xs for last region is pin averaged
+        # self-shielded xs
+        self._resnuc_xs = {}
+        self._resnuc_xs[res_nuc] = {}
+        self._init_self_shielded_xs()
+
+        if self._first_calc_g is None:
+            first_calc_g = self._micro_lib.first_res
+        else:
+            first_calc_g = self._first_calc_g
+        if self._last_calc_g is None:
+            last_calc_g = self._micro_lib.last_res
+        else:
+            last_calc_g = self._last_calc_g
+        for ig in range(first_calc_g, last_calc_g):
+            jg = ig - self._micro_lib.first_res
+            if ave_solver._n_band[jg] > 1:
+                # The reference reaction
+                if self._partial_xs_preserve_reaction:
+                    reaction_ref = np.sum(
+                        ave_solver.resnuc_xs[res_nuc]['xs_abs']
+                        [jg, 0:self._n_res_reg] *
+                        ave_solver.flux[jg, 0:self._n_res_reg])
+                else:
+                    reaction_ref \
+                        = ave_solver.resnuc_xs[res_nuc]['xs_abs'][jg, -1]
+                # XS for max average temperature and min average temperature
+                temp_left = min(res_nuc_temps)
+                temp_right = max(res_nuc_temps)
+                # temp_left = 1200.0
+                # temp_right = 1800.0
+                reaction0, xs_abs0, flux0 = self._solve_partial_xs_ave_temp(
+                    temp_left, ig)
+                reaction1, xs_abs1, flux1 = self._solve_partial_xs_ave_temp(
+                    temp_right, ig)
+                # print(reaction0, reaction1, reaction_ref)
+                n_search = 2
+                if reaction0 <= reaction1:
+                    if reaction_ref <= reaction0:
+                        xs_abs_mid = xs_abs0
+                        flux_mid = flux0
+                        temp_mid = temp_left
+                    elif reaction_ref >= reaction1:
+                        xs_abs_mid = xs_abs1
+                        flux_mid = flux1
+                        temp_mid = temp_right
+                    else:
+                        reaction_left = reaction0
+                        reaction_right = reaction1
+                        temp_mid = 0.0
+                        last_temp_mid = 100.0
+                        while True:
+                            if abs(last_temp_mid - temp_mid) < 1.0:
+                                break
+                            n_search += 1
+                            r = (reaction_right - reaction_ref) \
+                                / (reaction_right - reaction_left)
+                            last_temp_mid = temp_mid
+                            temp_mid = r * temp_left + (1.0 - r) * temp_right
+                            print(temp_left, temp_mid, temp_right)
+                            reaction_mid, xs_abs_mid, flux_mid \
+                                = self._solve_partial_xs_ave_temp(temp_mid, ig)
+                            if reaction_mid >= reaction_ref:
+                                reaction_right = reaction_mid
+                                temp_right = temp_mid
+                            else:
+                                reaction_left = reaction_mid
+                                temp_left = temp_mid
+                else:
+                    if reaction_ref >= reaction0:
+                        xs_abs_mid = xs_abs0
+                        flux_mid = flux0
+                        temp_mid = temp_left
+                    elif reaction_ref <= reaction1:
+                        xs_abs_mid = xs_abs1
+                        flux_mid = flux1
+                        temp_mid = temp_right
+                    else:
+                        reaction_left = reaction0
+                        reaction_right = reaction1
+                        temp_mid = 0.0
+                        last_temp_mid = 100.0
+                        while True:
+                            if abs(last_temp_mid - temp_mid) < 1.0:
+                                break
+                            n_search += 1
+                            r = (reaction_right - reaction_ref) \
+                                / (reaction_right - reaction_left)
+                            last_temp_mid = temp_mid
+                            temp_mid = r * temp_left + (1.0 - r) * temp_right
+                            print(temp_left, temp_mid, temp_right)
+                            reaction_mid, xs_abs_mid, flux_mid \
+                                = self._solve_partial_xs_ave_temp(temp_mid, ig)
+                            if reaction_mid >= reaction_ref:
+                                reaction_left = reaction_mid
+                                temp_left = temp_mid
+                            else:
+                                reaction_right = reaction_mid
+                                temp_right = temp_mid
+                self._resnuc_xs[res_nuc]['xs_abs'][jg, :] = xs_abs_mid
+                self._flux[jg, :] = flux_mid[:]
+                print(ig, n_search, temp_mid)
 
     def solve_partial_xs_fit_var(self):
         if self._pin_cell.ave_temp is None:
@@ -779,15 +939,19 @@ class ResonancePinSubgroup(object):
             last_calc_g = self._micro_lib.last_res
         else:
             last_calc_g = self._last_calc_g
+        n_res = self._micro_lib.last_res - self._micro_lib.first_res
+        self._n_band = np.zeros(n_res)
         for ig in range(first_calc_g, last_calc_g):
+            jg = ig - self._micro_lib.first_res
             # Get subgroup parameters
             if self._use_pseudo_lib:
                 subp = self._pseudo_lib.get_subp_one_nuc(ig, res_nuc)
             else:
-                subp = self._micro_lib.get_subp(res_nuc, res_mat.temperature,
-                                                ig)
+                subp = self._micro_lib.get_subp(
+                    res_nuc, res_mat.temperature, ig)
 
             print(ig, subp['n_band'])
+            self._n_band[jg] = subp['n_band']
             if subp['n_band'] > 1:
                 sub_flux = np.zeros((subp['n_band'], n_region))
                 for ib in range(subp['n_band']):
@@ -888,6 +1052,8 @@ class ResonancePinSubgroup(object):
     def _init_self_shielded_xs(self):
         # Initialize (pin averaged) self_shielded xs at typical dilution
         n_res = self._micro_lib.last_res - self._micro_lib.first_res
+        n_region = len(self._pin_cell.mat_fill)
+        self._flux = np.ones((n_res, n_region))
         for nuc in self._resnuc_xs:
             self._resnuc_xs[nuc]['xs_abs'] \
                 = np.zeros((n_res, self._n_res_reg+1))
@@ -932,6 +1098,7 @@ class ResonancePinSubgroup(object):
             sub_flux[ib, :] *= vols[:]
         flux = np.sum(sub_flux, 0)
         sum_flux = np.sum(flux[0:n])
+        self._flux[jg, :] = flux[:]
 
         # Condense subgroup xs to self-shielded xs
         for ireg in range(n):
@@ -1026,6 +1193,14 @@ class ResonancePinSubgroup(object):
         self._micro_lib = micro_lib
 
     @property
+    def flux(self):
+        return self._flux
+
+    @flux.setter
+    def flux(self, flux):
+        self._flux = flux
+
+    @property
     def use_pseudo_lib(self):
         return self._use_pseudo_lib
 
@@ -1072,6 +1247,22 @@ class ResonancePinSubgroup(object):
     @resnuc_xs.setter
     def resnuc_xs(self, resnuc_xs):
         self._resnuc_xs = resnuc_xs
+
+    @property
+    def partial_xs_preserve_reaction(self):
+        return self._partial_xs_preserve_reaction
+
+    @partial_xs_preserve_reaction.setter
+    def partial_xs_preserve_reaction(self, partial_xs_preserve_reaction):
+        self._partial_xs_preserve_reaction = partial_xs_preserve_reaction
+
+    @property
+    def n_band(self):
+        return self._n_band
+
+    @n_band.setter
+    def n_band(self, n_band):
+        self._n_band = n_band
 
     @property
     def n_res_reg(self):
