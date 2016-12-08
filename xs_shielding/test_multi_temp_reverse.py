@@ -65,11 +65,11 @@ def plot_adjust_sub_level():
     # plt.show()
 
 
-def test_975():
+def test_1010():
     # OpenMC cross sections
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
     # Define materials
-    fuel = Material(temperature=975.0, nuclides=['U238'],
+    fuel = Material(temperature=1010.0, nuclides=['U238'],
                     densities=[2.21546e-2], name='fuel')
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
@@ -103,7 +103,7 @@ def test_975():
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
     sub.solve_onenuc_onetemp()
-    sub.print_self_shielded_xs(to_h5='simple-pin-975.h5', to_screen=True)
+    sub.print_self_shielded_xs(to_h5='simple-pin-1010.h5', to_screen=True)
 
 
 def test_partial_xs_fit_new(ig):
@@ -130,7 +130,7 @@ def test_partial_xs_fit_new(ig):
                      densities=[2.21546e-2], name='fuel8')
     fuel9 = Material(temperature=820.0, nuclides=['U238'],
                      densities=[2.21546e-2], name='fuel9')
-    fuel_ave = Material(temperature=975.0, nuclides=['U238'],
+    fuel_ave = Material(temperature=1010.0, nuclides=['U238'],
                         densities=[2.21546e-2], name='fuel_ave')
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
@@ -141,8 +141,8 @@ def test_partial_xs_fit_new(ig):
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -174,7 +174,7 @@ def test_partial_xs_fit_new(ig):
         0.41
     ]
     pin_ave.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-    pin_ave.ave_temp = 975.0
+    pin_ave.ave_temp = 1010.0
     sub = ResonancePinSubgroup(first_calc_g=ig, last_calc_g=ig+1)
     # sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -214,7 +214,7 @@ def test_adjust_numdens():
                      densities=[2.21546e-2], name='fuel8')
     fuel9 = Material(temperature=820.0, nuclides=['U238'],
                      densities=[2.21546e-2], name='fuel9')
-    fuel_ave = Material(temperature=975.0, nuclides=['U238'],
+    fuel_ave = Material(temperature=1010.0, nuclides=['U238'],
                         densities=[2.21546e-2], name='fuel_ave')
     mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
                    name='moderator')
@@ -225,8 +225,8 @@ def test_adjust_numdens():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -240,7 +240,7 @@ def test_adjust_numdens():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # Define pin cell at average temperature
     pin_ave = PinCell()
     pin_ave.pin_type = PINCELLBOX
@@ -259,7 +259,7 @@ def test_adjust_numdens():
         0.41
     ]
     pin_ave.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-    pin_ave.ave_temp = 975.0
+    pin_ave.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=26, last_calc_g=27)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -307,8 +307,8 @@ def test_correlation_variant():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -322,7 +322,7 @@ def test_correlation_variant():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=13, last_calc_g=14)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -369,8 +369,8 @@ def test_partial_xs_fit_var():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -384,7 +384,7 @@ def test_partial_xs_fit_var():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -396,91 +396,6 @@ def test_partial_xs_fit_var():
     sub.solve_partial_xs_fit_var()
     sub.print_self_shielded_xs(to_h5='simple-pin-partial-xs-fit-var.h5',
                                to_screen=True)
-
-
-def test_sim_partial_xs():
-    # OpenMC cross sections
-    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
-    # Define materials
-    fuel0 = Material(temperature=1190.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel0')
-    fuel1 = Material(temperature=1140.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel1')
-    fuel2 = Material(temperature=1100.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel2')
-    fuel3 = Material(temperature=1060.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel3')
-    fuel4 = Material(temperature=1010.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel4')
-    fuel5 = Material(temperature=970.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel5')
-    fuel6 = Material(temperature=930.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel6')
-    fuel7 = Material(temperature=890.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel7')
-    fuel8 = Material(temperature=860.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel8')
-    fuel9 = Material(temperature=820.0, nuclides=['U238'],
-                     densities=[2.21546e-2], name='fuel9')
-    fuel_ave = Material(temperature=975.0, nuclides=['U238'],
-                        densities=[2.21546e-2], name='fuel_ave')
-    mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
-                   name='moderator')
-    # Load micro library
-    lib = LibraryMicro()
-    lib.load_from_h5(_MICROMGLIB)
-    # Define a pin cell
-    pin = PinCell()
-    pin.pin_type = PINCELLBOX
-    pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
-    pin.radii = [
-        0.129653384067,
-        0.183357574155,
-        0.224566248577,
-        0.259306768134,
-        0.289913780286,
-        0.317584634389,
-        0.343030610879,
-        0.36671514831,
-        0.388960152201,
-        0.41
-    ]
-    pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
-    # Define pin cell at average temperature
-    pin_ave = PinCell()
-    pin_ave.pin_type = PINCELLBOX
-    pin_ave.pitch = 1.26
-    pin_ave.materials = [fuel_ave, mod]
-    pin_ave.radii = [
-        0.129653384067,
-        0.183357574155,
-        0.224566248577,
-        0.259306768134,
-        0.289913780286,
-        0.317584634389,
-        0.343030610879,
-        0.36671514831,
-        0.388960152201,
-        0.41
-    ]
-    pin_ave.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-    pin_ave.ave_temp = 975.0
-    # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
-    sub = ResonancePinSubgroup()
-    sub.pin_cell = pin
-    sub.pin_cell_ave = pin_ave
-    sub.pin_solver = PinFixSolver()
-    sub.pin_solver.n_ring_fuel = 20
-    sub.micro_lib = lib
-    sub.cross_sections = cross_sections
-    sub.use_pseudo_lib = True
-    sub.solve_sim_partial_xs()
-    sub.print_self_shielded_xs(to_h5='simple-pin-sim-partial-xs.h5',
-                               to_screen=True)
-    sub.write_macro_xs('simple-pin-macro.h5')
 
 
 def test_partial_xs_fit():
@@ -516,8 +431,8 @@ def test_partial_xs_fit():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -531,7 +446,7 @@ def test_partial_xs_fit():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -578,8 +493,8 @@ def test_correlation():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -593,7 +508,7 @@ def test_correlation():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=26, last_calc_g=27)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -640,8 +555,8 @@ def test_adjust_level():
     pin = PinCell()
     pin.pin_type = PINCELLBOX
     pin.pitch = 1.26
-    pin.materials = [fuel0, fuel1, fuel2, fuel3, fuel4, fuel5, fuel6, fuel7,
-                     fuel8, fuel9, mod]
+    pin.materials = [fuel9, fuel8, fuel7, fuel6, fuel5, fuel4, fuel3, fuel2,
+                     fuel1, fuel0, mod]
     pin.radii = [
         0.129653384067,
         0.183357574155,
@@ -655,7 +570,7 @@ def test_adjust_level():
         0.41
     ]
     pin.mat_fill = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    pin.ave_temp = 975.0
+    pin.ave_temp = 1010.0
     # sub = ResonancePinSubgroup(first_calc_g=15, last_calc_g=16)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
@@ -674,17 +589,32 @@ def run_partial_xs_fit_new():
     test_partial_xs_fit_new(int(sys.argv[-1]))
 
 
+def run_all():
+    import sys
+    i = int(sys.argv[-1])
+    if i == 0:
+        test_1010()
+    elif i == 1:
+        test_adjust_level()
+    elif i == 2:
+        test_partial_xs_fit()
+    elif i == 3:
+        test_correlation()
+    elif i == 4:
+        test_adjust_numdens()
+
+
 if __name__ == '__main__':
     # recommend run with:
     # $ ... -s 0.005 -a 256
-    # test_975()
+    # test_1010()
     # test_adjust_level()
     # test_partial_xs_fit()
     # test_partial_xs_fit_new(21)
-    # run_partial_xs_fit_new()
-    test_sim_partial_xs()
+    run_partial_xs_fit_new()
     # test_partial_xs_fit_var()
     # test_correlation()
     # test_correlation_variant()
     # test_adjust_numdens()
     # plot_adjust_sub_level()
+    # run_all()

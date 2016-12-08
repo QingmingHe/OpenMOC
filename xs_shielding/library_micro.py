@@ -333,10 +333,47 @@ class LibraryMicro(object):
         if 'scatter' in args:
             xs['scatter'] = r * nuc._xs_sca_tot[itemp0][ig] \
                 + (1.0 - r) * nuc._xs_sca_tot[itemp1][ig]
+        # Scatter matrix (zero-th order)
+        if 'scatter_matrix_0' in args:
+            xs['scatter_matrix_0'] = np.zeros(self._ng)
+            for ig_to in range(self._ng):
+                if ig >= nuc._xs_sca[itemp0][0][ig_to]['ig0'] \
+                   and ig < nuc._xs_sca[itemp0][0][ig_to]['ig1']:
+                    ig_from = ig - nuc._xs_sca[itemp0][0][ig_to]['ig0']
+                    xs['scatter_matrix_0'][ig_to] \
+                        += r * nuc._xs_sca[itemp0][0][ig_to]['data'][ig_from]
+                if ig >= nuc._xs_sca[itemp1][0][ig_to]['ig0'] \
+                   and ig < nuc._xs_sca[itemp1][0][ig_to]['ig1']:
+                    ig_from = ig - nuc._xs_sca[itemp1][0][ig_to]['ig0']
+                    xs['scatter_matrix_0'][ig_to] \
+                        += (1.0 - r) * \
+                        nuc._xs_sca[itemp1][0][ig_to]['data'][ig_from]
+        # Scatter matrix (first order)
+        if 'scatter_matrix_1' in args:
+            xs['scatter_matrix_1'] = np.zeors(self._ng)
+            for ig_to in range(self._ng):
+                if ig >= nuc._xs_sca[itemp0][1][ig_to]['ig0'] \
+                   and ig < nuc._xs_sca[itemp0][1][ig_to]['ig1']:
+                    ig_from = ig - nuc._xs_sca[itemp0][1][ig_to]['ig0']
+                    xs['scatter_matrix_1'][ig_to] \
+                        += r * nuc._xs_sca[itemp0][1][ig_to]['data'][ig_from]
+                if ig >= nuc._xs_sca[itemp1][1][ig_to]['ig0'] \
+                   and ig < nuc._xs_sca[itemp1][1][ig_to]['ig1']:
+                    ig_from = ig - nuc._xs_sca[itemp1][1][ig_to]['ig0']
+                    xs['scatter_matrix_1'][ig_to] \
+                        += (1.0 - r) * \
+                        nuc._xs_sca[itemp1][1][ig_to]['data'][ig_from]
         # Absorb xs
         if 'absorb' in args:
             xs['absorb'] = r * nuc._xs_abs[itemp0][ig] \
                 + (1.0 - r) * nuc._xs_abs[itemp1][ig]
+        # Fission xs
+        if 'fission' in args:
+            if nuc._fissionable:
+                xs['fission'] = r * nuc._xs_fis[itemp0][ig] \
+                    + (1.0 - r) * nuc._xs_fis[itemp1][ig]
+            else:
+                xs['fission'] = 0.0
         # Nu fission xs
         if 'nufis' in args:
             if nuc._fissionable:

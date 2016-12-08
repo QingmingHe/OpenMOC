@@ -196,13 +196,19 @@ class ResonancePinSubgroup(object):
                 # XS for max average temperature and min average temperature
                 temp_left = min(res_nuc_temps)
                 temp_right = max(res_nuc_temps)
-                # temp_left = 1200.0
+                # temp_left = 293.0
                 # temp_right = 1800.0
                 reaction0, xs_abs0, flux0 = self._solve_partial_xs_ave_temp(
                     temp_left, ig)
                 reaction1, xs_abs1, flux1 = self._solve_partial_xs_ave_temp(
                     temp_right, ig)
-                # print(reaction0, reaction1, reaction_ref)
+                # print reaction_ref
+                # for temp in np.linspace(300.0, 1800.0, 31):
+                #     reaction2, xs_abs2, flux2 = self._solve_partial_xs_ave_temp(
+                #         temp, ig)
+                #     print(temp, reaction2)
+                print(reaction0, reaction1, reaction_ref)
+                # return
                 n_search = 2
                 if reaction0 <= reaction1:
                     if reaction_ref <= reaction0:
@@ -363,6 +369,198 @@ class ResonancePinSubgroup(object):
                 # Condense self-shielded xs
                 self._condense_self_shielded_xs(
                     ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+
+    def _calc_xs_shape_ratio(self, ig, nuc, resnuc_xs, apply_ratio=True):
+        jg = ig - self._micro_lib.first_res
+        n_res = self._micro_lib.last_res - self._micro_lib.first_res
+        if 'ratio_shape_abs' not in self._resnuc_xs[nuc]:
+            self._resnuc_xs[nuc]['ratio_shape_abs'] = np.ones(n_res)
+            self._resnuc_xs[nuc]['ratio_shape_tot'] = np.ones(n_res)
+            self._resnuc_xs[nuc]['ratio_shape_sca'] = np.ones(n_res)
+            if self._micro_lib.has_resfis(nuc):
+                self._resnuc_xs[nuc]['ratio_shape_nfi'] = np.ones(n_res)
+        self._resnuc_xs[nuc]['ratio_shape_abs'] \
+            = resnuc_xs[nuc]['xs_abs'][jg, self._n_res_reg] \
+            / self._resnuc_xs[nuc]['xs_abs'][jg, self._n_res_reg]
+        self._resnuc_xs[nuc]['ratio_shape_tot'] \
+            = resnuc_xs[nuc]['xs_tot'][jg, self._n_res_reg] \
+            / self._resnuc_xs[nuc]['xs_tot'][jg, self._n_res_reg]
+        self._resnuc_xs[nuc]['ratio_shape_sca'] \
+            = resnuc_xs[nuc]['xs_sca'][jg, self._n_res_reg] \
+            / self._resnuc_xs[nuc]['xs_sca'][jg, self._n_res_reg]
+        if self._micro_lib.has_resfis(nuc):
+            self._resnuc_xs[nuc]['ratio_shape_nfi'] \
+                = resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg] \
+                / self._resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg]
+        if apply_ratio:
+            resnuc = self._resnuc_xs[nuc]
+            resnuc['xs_abs'] *= resnuc['ratio_shape_abs']
+            resnuc['xs_tot'] *= resnuc['ratio_shape_tot']
+            resnuc['xs_sca'] *= resnuc['ratio_shape_sca']
+            if self._micro_lib.has_resfis(nuc):
+                resnuc['xs_nfi'] *= resnuc['ratio_shape_nfi']
+
+    def write_macro_xs(self, fname):
+        f = h5py.File(fname, 'w')
+
+        n_region = len(self._pin_cell.mat_fill)
+        for ireg in range(n_region):
+            imat = self._pin_cell.mat_fill[ireg]
+            mat = self._pin_cell.materials[imat]
+
+            # (Average) Fission spectrum
+            f['/material/%i/chi' % ireg] = self._micro_lib.average_chi
+
+            # All kinds of XS
+            xs_tot = np.zeros(self._micro_lib.ng)
+            xs_fis = np.zeros(self._micro_lib.ng)
+            xs_nfi = np.zeros(self._micro_lib.ng)
+            xs_sca = np.zeros((self._micro_lib.ng, self._micro_lib.ng))
+            for ig in range(self._micro_lib.ng):
+                jg = ig - self._micro_lib.first_res
+                for inuc, nuc in enumerate(mat.nuclides):
+                    xs = self._micro_lib.get_typical_xs(
+                        nuc, mat.temperature, ig, 'total', 'fission',
+                        'nufis', 'scatter_matrix_0', 'nu', 'scatter')
+                    if ig >= self._micro_lib.first_res and \
+                       ig < self._micro_lib.last_res and \
+                       ireg < self._n_res_reg and \
+                       self._micro_lib.has_res(nuc):
+                        xs_tot[ig] += mat.densities[inuc] * \
+                            self._resnuc_xs[nuc]['xs_tot'][jg, ireg]
+                        xs_sca[ig, :] += mat.densities[inuc] * \
+                            self._resnuc_xs[nuc]['xs_sca'][jg, ireg] * \
+                            xs['scatter_matrix_0'] / xs['scatter']
+                        if self._micro_lib.has_resfis(nuc):
+                            xs_fis[ig] += mat.densities[inuc] * \
+                                self._resnuc_xs[nuc]['xs_nfi'][jg, ireg] \
+                                / xs['nu']
+                            xs_nfi[ig] += mat.densities[inuc] * \
+                                self._resnuc_xs[nuc]['xs_nfi'][jg, ireg]
+                        else:
+                            xs_fis[ig] += mat.densities[inuc] * \
+                                xs['nufis'] / xs['nu']
+                            xs_nfi[ig] += mat.densities[inuc] * xs['nufis']
+                    else:
+                        xs_tot[ig] += mat.densities[inuc] * xs['total']
+                        xs_sca[ig, :] += mat.densities[inuc] * \
+                            xs['scatter_matrix_0']
+                        xs_fis[ig] += mat.densities[inuc] * xs['fission']
+                        xs_nfi[ig] += mat.densities[inuc] * xs['nufis']
+
+            # Write the xs to file
+            f['/material/%i/total' % ireg] = xs_tot
+            f['/material/%i/fission' % ireg] = xs_fis
+            f['/material/%i/nu_fission' % ireg] = xs_nfi
+            f['/material/%i/scatter matrix' % ireg] = xs_sca.flatten()
+
+    def solve_sim_partial_xs(self):
+        if self._pin_cell.ave_temp is None:
+            raise Exception('ave_temp of PinCell should be given')
+
+        # Solve problem at average temperature
+        ave_solver = ResonancePinSubgroup()
+        ave_solver.pin_cell = self.pin_cell_ave
+        ave_solver.pin_solver = self.pin_solver
+        ave_solver.micro_lib = self.micro_lib
+        ave_solver.use_pseudo_lib = self.use_pseudo_lib
+        ave_solver.cross_sections = self.cross_sections
+        ave_solver.first_calc_g = self.first_calc_g
+        ave_solver.last_calc_g = self.last_calc_g
+        ave_solver.solve_onenuc_onetemp()
+
+        # Set pin geometry
+        self._pin_solver.set_pin_geometry(self._pin_cell)
+
+        # Count number of resonant region
+        self._count_n_res_reg()
+
+        # Initialize subgroup macro xs
+        n_region = len(self._pin_cell.mat_fill)
+        mac_tot = np.zeros(n_region)
+        mac_sca = np.zeros(n_region)
+        mac_src = np.zeros(n_region)
+
+        # Initialize pseudo library at all temperatures
+        res_nuc = None
+        res_nuc_temps = []
+        for mat in self._pin_cell.materials:
+            for inuc, nuc in enumerate(mat.nuclides):
+                if self._micro_lib.has_res(nuc):
+                    res_nuc = nuc
+                    res_nuc_temps.append(mat.temperature)
+                    break
+        self._init_plib_one_nuc_multi_temp(res_nuc, 1.0, res_nuc_temps,
+                                           self._pin_cell.ave_temp)
+
+        # Initialize self-shielded xs. Xs for last region is pin averaged
+        # self-shielded xs
+        self._resnuc_xs = {}
+        self._resnuc_xs[res_nuc] = {}
+        self._init_self_shielded_xs()
+
+        if self._first_calc_g is None:
+            first_calc_g = self._micro_lib.first_res
+        else:
+            first_calc_g = self._first_calc_g
+        if self._last_calc_g is None:
+            last_calc_g = self._micro_lib.last_res
+        else:
+            last_calc_g = self._last_calc_g
+        for ig in range(first_calc_g, last_calc_g):
+            # Get subgroup parameters at all temperature
+            pt_ave, pts = self._pseudo_lib.get_subp_one_nuc(ig, res_nuc)
+            n_band = pt_ave['n_band']
+
+            print(ig, n_band)
+            if n_band > 1:
+                sub_flux = np.zeros((n_band, n_region))
+                for ib in range(n_band):
+                    mac_tot[:] = 0.0
+                    mac_sca[:] = 0.0
+                    mac_src[:] = 0.0
+                    for ireg in range(n_region):
+                        imat = self._pin_cell.mat_fill[ireg]
+                        mat = self._pin_cell.materials[imat]
+                        for inuc, nuc in enumerate(mat.nuclides):
+                            if nuc == res_nuc:
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pts[ireg]['sub_tot'][ib]
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] \
+                                    * pts[ireg]['sub_sca'][ib] * \
+                                    (1.0 - pts[ireg]['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    pts[ireg]['lambda'] * pts[ireg]['potential']
+                            else:
+                                xs_typ = self._micro_lib.get_typical_xs(
+                                    nuc, mat.temperature, ig, 'total',
+                                    'scatter', 'potential', 'lambda')
+                                mac_tot[ireg] \
+                                    += mat.densities[inuc] * xs_typ['total']
+                                mac_sca[ireg] \
+                                    += mat.densities[inuc] * xs_typ['scatter']\
+                                    * (1.0 - xs_typ['lambda'])
+                                mac_src[ireg] \
+                                    += mat.densities[inuc] * \
+                                    xs_typ['lambda'] * xs_typ['potential']
+
+                    # Solve subgroup fixed source equation and get volume
+                    # integrated flux
+                    self._pin_solver.set_pin_xs(xs_tot=mac_tot, xs_sca=mac_sca,
+                                                source=mac_src)
+                    self._pin_solver.solve()
+                    sub_flux[ib, :] = self._pin_solver.flux \
+                        * pt_ave['sub_wgt'][ib]
+
+                # Condense self-shielded xs
+                self._condense_self_shielded_xs(
+                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+
+                # Calculate XS shape correction factor
+                self._calc_xs_shape_ratio(ig, res_nuc, ave_solver.resnuc_xs)
 
     def solve_partial_xs_fit(self):
         if self._pin_cell.ave_temp is None:
@@ -1433,7 +1631,8 @@ class PinFixSolver(object):
         n_fsr = geometry.getNumFSRs()
 
         # Solver the fixed source problem with scattering iteration
-        self._moc_solver.iterateScattSource()
+        # self._moc_solver.iterateScattSource()
+        self._moc_solver.computeSource(self._moc_opts.max_iters)
         fsr_fluxes = get_scalar_fluxes(self._moc_solver)
 
         # Get the volumes

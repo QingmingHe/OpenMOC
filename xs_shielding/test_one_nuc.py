@@ -15,7 +15,7 @@ def test_one_nuc():
                    name='moderator')
     # Load micro library
     fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs',
+                         'Dropbox/work/codes/openmoc/micromgxs',
                          'jeff-3.2-wims69e.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)

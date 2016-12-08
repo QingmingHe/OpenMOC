@@ -21,9 +21,6 @@ def plot_lambda(acelib, nuclide, kT_grp):
             if is_disappearance(mt):
                 xs_abs[i:i+n] += xs.value
 
-        # MeV to eV
-        energy *= 1e6
-
     # Lambda preserving homogeneous xs
     lambda1 = [
         1.00000000000E+00, 9.88330500000E-01, 1.00000000000E+00,
@@ -75,9 +72,9 @@ def plot_lambda(acelib, nuclide, kT_grp):
     fig, ax1 = plt.subplots()
 
     lw = 3
-    ax1.plot(grp_bnds, lambda1, 'r', ls='steps', label='homo xs', lw=lw)
-    ax1.plot(grp_bnds, lambda2, 'k', ls='steps', label='heter xs', lw=lw)
-    ax1.plot(grp_bnds, lambda3, 'y', ls='steps', label='homo flux', lw=lw)
+    ax1.plot(grp_bnds, lambda1, 'r', ls='steps', label='homogeneous lambda', lw=lw)
+    ax1.plot(grp_bnds, lambda2, 'k', ls='steps', label='heterogeneous lambda', lw=lw)
+    # ax1.plot(grp_bnds, lambda3, 'y', ls='steps', label='homo flux', lw=lw)
     # Set properties
     ax1.set(xscale="log", yscale="linear", xlabel="energy", ylabel="lambda")
     # Show legend specified by label key word in "plot"
@@ -86,7 +83,7 @@ def plot_lambda(acelib, nuclide, kT_grp):
     # Create another axe
     ax2 = ax1.twinx()
     ax2.plot(energy, xs_abs, label='absorption')
-    ax2.set(yscale="log", ylabel="cross sections / barn")
+    ax2.set(yscale="log", ylabel="cross sections/barn")
     ax2.legend(loc="upper right")
 
     plt.xlim(4.0, 9118.0)
@@ -94,8 +91,8 @@ def plot_lambda(acelib, nuclide, kT_grp):
     # Set title
     # plt.title("", fontsize="large")
     # Show fig or save fig: show(), savefig(figname) and close()
-    # plt.savefig('lambda.png')
-    plt.show()
+    plt.savefig('lambda.png')
+    # plt.show()
 
 if __name__ == '__main__':
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')

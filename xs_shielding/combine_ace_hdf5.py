@@ -19,6 +19,8 @@ def combine(files, to_file):
         for ifile, afile in enumerate(files):
             with h5py.File(afile) as f0:
                 if ifile == 0:
+                    for key in f0.attrs:
+                        f1.attrs[key] = f0.attrs[key]
                     for key in f0[nuclide].attrs:
                         f1[nuclide].attrs[key] = f0[nuclide].attrs[key]
                 grp = '/%s/energy' % nuclide
@@ -48,7 +50,8 @@ def combine(files, to_file):
 
 if __name__ == '__main__':
     import os
-    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
+    cross_sections \
+        = "/home/qingming/library/jeff-3.2-1.0/jeff-3.2-hdf5/cross_sections.xml"
     jeff_dir = os.path.dirname(cross_sections)
     u238_files = [os.path.join(jeff_dir, fname)
                   for fname in ['U238.h5', 'U238new.h5']]

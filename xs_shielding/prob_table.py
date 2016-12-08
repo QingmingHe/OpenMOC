@@ -243,19 +243,19 @@ class ProbTable(object):
             if self._xs_xxx is None:
                 for ib in range(n_band):
                     if sub_tot[n_band][ib] <= 0.0 \
+                       or sub_sca[n_band][ib] > 1.0 * sub_tot[n_band][ib] \
                        or sub_sca[n_band][ib] <= 0.0 \
                        or sub_wgt[n_band][ib] <= 0.0 \
-                       or sub_wgt[n_band][ib] >= 1.0 \
-                       or sub_sca[n_band][ib] > sub_tot[n_band][ib]:
+                       or sub_wgt[n_band][ib] >= 1.0:
                         stable = False
                         break
             else:
                 for ib in range(n_band):
                     if sub_tot[n_band][ib] <= 0.0 \
+                       or sub_sca[n_band][ib] > 1.0 * sub_tot[n_band][ib] \
                        or sub_sca[n_band][ib] <= 0.0 \
                        or sub_wgt[n_band][ib] <= 0.0 \
-                       or sub_wgt[n_band][ib] >= 1.0 \
-                       or sub_sca[n_band][ib] > 1.0 * sub_tot[n_band][ib]:
+                       or sub_wgt[n_band][ib] >= 1.0:
                         stable = False
                     for ix in self._check_xxx_idx:
                         if sub_xxx[n_band][ix, ib] <= 0:
