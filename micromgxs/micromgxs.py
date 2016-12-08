@@ -440,8 +440,8 @@ class GroupStructure(object):
         if name is not None:
             if name == 'wims69e':
                 self.build_wims69e()
-            elif name == 'wims75':
-                self.build_wims75()
+            elif name == 'wims79':
+                self.build_wims79()
             else:
                 raise Exception('group structure name %s is not supported!' %
                                 (name))
@@ -487,14 +487,15 @@ class GroupStructure(object):
         self._first_res = 12
         self._last_res = 45
 
-    def build_wims75(self):
+    def build_wims79(self):
         self._group_boundaries = np.array([
             1.00000E+07, 6.06550E+06, 3.67900E+06, 2.23100E+06, 1.35300E+06,
             8.21000E+05, 5.00000E+05, 3.02500E+05, 1.83000E+05, 1.11000E+05,
             6.73400E+04, 4.08500E+04, 2.47800E+04, 1.50300E+04, 9.11800E+03,
-            5.53000E+03, 3.51910E+03, 2.23945E+03, 1.42510E+03,
-            9.06899E+02, 750.0, 500.0, 3.67263E+02, 325.0, 225.0, 200.0,
-            1.48729E+02, 110.0, 7.55014E+01, 4.80520E+01, 2.77000E+01,
+            5.53000E+03, 3.51910E+03, 2.23945E+03, 1.42510E+03, 9.06899E+02,
+            750.0,       500.0,       3.67263E+02, 325.0,       225.0,
+            200.0,       1.48729E+02, 140.0,       130.0,       110.0,
+            90.0,        85.0,        7.55014E+01, 4.80520E+01, 2.77000E+01,
             1.59680E+01, 9.87700E+00, 4.00000E+00, 3.30000E+00, 2.60000E+00,
             2.10000E+00, 1.50000E+00, 1.30000E+00, 1.15000E+00, 1.12300E+00,
             1.09700E+00, 1.07100E+00, 1.04500E+00, 1.02000E+00, 9.96000E-01,
@@ -504,19 +505,9 @@ class GroupStructure(object):
             1.40000E-01, 1.00000E-01, 8.00000E-02, 6.70000E-02, 5.80000E-02,
             5.00000E-02, 4.20000E-02, 3.50000E-02, 3.00000E-02, 2.50000E-02,
             2.00000E-02, 1.50000E-02, 1.00000E-02, 5.00000E-03, 1.00000E-05])
-        self._fispec = np.zeros(75)
-        self._fispec[:33] = [
-            2.76618619E-02, 1.16180994E-01, 2.18477324E-01, 2.32844964E-01,
-            1.74191684E-01, 1.08170442E-01, 6.10514991E-02, 3.14032026E-02,
-            1.55065255E-02, 7.54445791E-03, 3.62444320E-03, 1.73872744E-03,
-            8.40678287E-04, 4.03833983E-04, 1.86793957E-04, 8.33578233E-05,
-            4.29143147E-05, 2.21586834E-05, 1.14833065E-05, 3.03551951e-06,
-            3.03551951e-06, 3.03551951e-06,
-            6.30736962e-07, 6.30736962e-07, 6.30736962e-07, 6.30736962e-07,
-            3.06996298e-07, 3.06996298e-07, 1.86799028E-07, 1.18147128E-07,
-            5.79575818E-08, 2.61382667E-08, 1.37659502E-08]
+        self._fispec = np.zeros(79)
         self._first_res = 12
-        self._last_res = 51
+        self._last_res = 55
 
     def is_same_as(self, another):
         if not isinstance(another, GroupStructure):
@@ -568,8 +559,9 @@ def export_homo_problem_xml(nuclide, dilution, temperature,
     # Material is composed of background H-1 and the object nuclide
     mat = openmc.Material(material_id=1, name='mat')
     mat.set_density('atom/b-cm', 0.069335)
-    mat.add_nuclide(background_nuclide, dilution / 20.478001)
     mat.add_nuclide(nuclide, 1.0)
+    if nuclide != background_nuclide:
+        mat.add_nuclide(background_nuclide, dilution / 20.478001)
     if fission_nuclide is not None:
         if fission_nuclide != nuclide:
             if fisnuc_refdil is None:
@@ -648,12 +640,14 @@ class FullXs(object):
                                                     energy=watt_dist)
         settings_file.temperature = {'default': temperature}
         settings_file.create_fission_neutrons = False
+        settings_file.cutoff \
+            = {'energy': self._group_structure.group_boundaries[-1]}
         settings_file.export_to_xml()
 
         # Create tallies
         tallies = openmc.Tallies()
 
-        grp_bnds = [val / 1e6 for val in
+        grp_bnds = [val for val in
                     sorted(self._group_structure.group_boundaries)]
         energy_filter = openmc.EnergyFilter(grp_bnds)
         energy_out_filter = openmc.EnergyoutFilter(grp_bnds)
@@ -707,7 +701,7 @@ class FullXs(object):
 
         # Create tallies
         energy_out_tally = openmc.Tally()
-        grp_bnds = [val / 1e6 for val in
+        grp_bnds = [val for val in
                     sorted(self._group_structure.group_boundaries)]
         energy_filter = openmc.EnergyFilter(grp_bnds)
         energy_out_filter = openmc.EnergyoutFilter(grp_bnds)
@@ -937,7 +931,7 @@ class RItable(object):
         settings_file.particles = self._particles
         settings_file.create_fission_neutrons = False
         settings_file.cutoff \
-            = {'energy': self._group_structure.res_group_bnds[-1] * 1e-6}
+            = {'energy': self._group_structure.res_group_bnds[-1]}
         bounds = [-1, -1, -1, 1, 1, 1]
         uniform_dist = openmc.stats.Box(bounds[:3], bounds[3:],
                                         only_fissionable=False)
@@ -950,7 +944,7 @@ class RItable(object):
         # Create tallies
         tallies = openmc.Tallies()
 
-        grp_bnds = [val / 1e6 for val in
+        grp_bnds = [val for val in
                     sorted(self._group_structure.res_group_bnds)]
         energy_filter = openmc.EnergyFilter(grp_bnds)
         cell_filter = openmc.CellFilter((1, ))
@@ -974,21 +968,20 @@ class RItable(object):
 
         tallies.export_to_xml()
 
-    def _obtain_sd_xs(self, temperature, dilution, itemp, idil):
+    def _obtain_sd_xs(self, temperature, itemp):
         global _cross_sections
 
         # Initialize slowing down solver
+        emax = self._group_structure.res_group_bnds[0]
+        emin = self._group_structure.res_group_bnds[-1]
         sd = SDSolver()
         sd.setErgGrpBnd(self._group_structure.res_group_bnds)
         sd.setNumNuclide(2)
-        sd.setSolErgBnd(self._group_structure.res_group_bnds[-1],
-                        self._group_structure.res_group_bnds[0])
+        sd.setSolErgBnd(emin, emax)
 
         # Initialize resonant nuclides of slowing down solver
         celib = LibraryCe(_cross_sections)
-        hflib = celib.get_nuclide(self._nuclide, temperature,
-                                  self._group_structure.res_group_bnds[0],
-                                  self._group_structure.res_group_bnds[-1],
+        hflib = celib.get_nuclide(self._nuclide, temperature, emax, emin,
                                   self._has_resfis,
                                   find_nearest_temp=self._find_nearest_temp)
         resnuc = sd.getNuclide(0)
@@ -1008,16 +1001,20 @@ class RItable(object):
         sd.computeMgXs()
 
         for ig in range(self._group_structure.n_res):
-            self._flux[itemp, ig, idil] = sd.getMgFlux(ig, idil)
-            xs_tot = resnuc.getMgTotal(ig, idil)
-            self._nu_scatter[itemp, ig, idil] = resnuc.getMgScatter(ig, idil)
-            self._absorption[itemp, ig, idil] \
-                = xs_tot - self._nu_scatter[itemp, ig, idil]
-            if self._has_resfis:
-                self._nu_fission[itemp, ig, idil] \
-                    = self._nu[ig] * resnuc.getMgFission(ig, idil)
+            for idlt in range(len(self._dilutions)):
+                self._flux[itemp, ig, idlt] = sd.getMgFlux(ig, idlt)
+                xs_tot = resnuc.getMgTotal(ig, idlt)
+                self._nu_scatter[itemp, ig, idlt] \
+                    = resnuc.getMgScatter(ig, idlt)
+                self._absorption[itemp, ig, idlt] \
+                    = xs_tot - self._nu_scatter[itemp, ig, idlt]
+                if self._has_resfis:
+                    self._nu_fission[itemp, ig, idlt] \
+                        = self._nu[ig] * resnuc.getMgFission(ig, idlt)
 
-    def _obtain_openmc_xs(self, temperature, dilution, itemp, idil):
+        del sd
+
+    def _obtain_openmc_xs(self, temperature, dilution, itemp, idlt):
         # Export input files
         self._export_xml(temperature, dilution)
 
@@ -1027,7 +1024,7 @@ class RItable(object):
         # Load the tally data from statepoint
         statepoint = glob(os.path.join(
             os.getcwd(), "statepoint.%s.*" % (self._batches)))[0]
-        self._load_statepoint(statepoint, itemp, idil)
+        self._load_statepoint(statepoint, itemp, idlt)
 
     def build_library(self):
         global _cross_sections
@@ -1059,41 +1056,41 @@ class RItable(object):
         for itemp, temperature, in enumerate(self._temperatures):
             print('processing %s/resonance/temp%i ...' %
                   (self._nuclide, itemp))
-            for idil, dilution in enumerate(self._dilutions):
-                print('processing %s/resonance/temp%i/dil%i ...' %
-                      (self._nuclide, itemp, idil))
-                if self._ri_use_openmc:
-                    self._obtain_openmc_xs(temperature, dilution, itemp, idil)
-                else:
-                    self._obtain_sd_xs(temperature, dilution, itemp, idil)
+            if self._ri_use_openmc:
+                for idlt, dilution in enumerate(self._dilutions):
+                    print('processing %s/resonance/temp%i/dlt%i ...' %
+                          (self._nuclide, itemp, idlt))
+                    self._obtain_openmc_xs(temperature, dilution, itemp, idlt)
+            else:
+                self._obtain_sd_xs(temperature, itemp)
 
-    def _load_statepoint(self, statepoint, itemp, idil):
+    def _load_statepoint(self, statepoint, itemp, idlt):
         sp = openmc.StatePoint(statepoint)
 
         # Get flux
-        self._flux[itemp, :, idil] \
+        self._flux[itemp, :, idlt] \
             = sp.get_tally(scores=['flux']).sum[:, 0, 0][::-1] * \
             self._nuclide_density
 
         # Get absorption xs
-        self._absorption[itemp, :, idil] \
+        self._absorption[itemp, :, idlt] \
             = sp.get_tally(scores=['absorption'], nuclides=[self._nuclide])\
                 .sum[:, 0, 0][::-1]
-        self._absorption[itemp, :, idil] /= self._flux[itemp, :, idil]
+        self._absorption[itemp, :, idlt] /= self._flux[itemp, :, idlt]
 
         # Get scatter xs
-        self._nu_scatter[itemp, :, idil] \
+        self._nu_scatter[itemp, :, idlt] \
             = sp.get_tally(scores=['scatter'], nuclides=[self._nuclide])\
                 .sum[:, 0, 0][::-1]
-        self._nu_scatter[itemp, :, idil] /= self._flux[itemp, :, idil]
+        self._nu_scatter[itemp, :, idlt] /= self._flux[itemp, :, idlt]
 
         # Get nu fission xs
         if self._has_resfis:
-            self._nu_fission[itemp, :, idil] \
+            self._nu_fission[itemp, :, idlt] \
                 = sp.get_tally(scores=['nu-fission'],
                                nuclides=[self._nuclide]).sum[:, 0, 0][::-1]
-            self._nu_fission[itemp, :, idil] \
-                /= self._flux[itemp, :, idil]
+            self._nu_fission[itemp, :, idlt] \
+                /= self._flux[itemp, :, idlt]
 
     def export_to_h5(self, fname):
         f = h5py.File(fname)
@@ -1143,9 +1140,11 @@ class RItable(object):
         f.close()
 
 if __name__ == '__main__':
+    libname = 'wims79'
+    lib_fname = 'jeff-3.2-%s.h5' % libname
+    set_default_settings(batches=30, inactive=10, particles=1000)
+    group_structure = GroupStructure(libname)
     opts_list = []
-    lib_fname = 'jeff-3.2-wims75.h5'
-    set_default_settings(batches=1000, inactive=100, particles=100000)
 
     # Options for generating U238
     opts_u238 = MicroMgXsOptions()
@@ -1155,7 +1154,7 @@ if __name__ == '__main__':
     # opts_u238.temperatures = [293.6]
     # opts_u238.dilutions = [28.0]
     opts_u238.ri_use_openmc = False
-    opts_u238.group_structure = GroupStructure(name='wims75')
+    opts_u238.group_structure = group_structure
     opts_list.append(opts_u238)
 
     # # Options for generating U235
@@ -1168,6 +1167,7 @@ if __name__ == '__main__':
     # Options for generating H1
     opts_h1 = MicroMgXsOptions()
     opts_h1.nuclide = 'H1'
+    opts_h1.group_structure = group_structure
     opts_list.append(opts_h1)
 
     # # Options for generating O16

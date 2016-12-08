@@ -53,7 +53,7 @@ def build_background_library(cross_sections, bnuc_file,
 
 
 def build_background_nuclide(from_h5, to_h5, from_nuc, to_nuc, potential,
-                             n_erg=100, erg_stt=1e-11, erg_end=20.0):
+                             n_erg=100, erg_stt=1e-5, erg_end=20e6):
     to_f = h5py.File(to_h5)
     from_f = h5py.File(from_h5)
 
@@ -61,6 +61,9 @@ def build_background_nuclide(from_h5, to_h5, from_nuc, to_nuc, potential,
     if to_nuc in to_f:
         del to_f[to_nuc]
     to_f.create_group(to_nuc)
+
+    # Copy file attributes
+    _copy_attrs(from_f, to_f)
 
     # Copy nuclide attributes
     _copy_attrs(from_f[from_nuc], to_f[to_nuc])

@@ -9,7 +9,7 @@ from potentials import average_potential
 from openmoc import (SDLibrary, SDLibrary_interpEnergy,
                      SDLibrary_interpEnergyTemperature)
 
-_K_BOLTZMANN = 8.6173324e-11
+_K_BOLTZMANN = 8.6173324e-5
 _N_GAMMA = 102
 _N_DA = 117
 _N_P0 = 600
@@ -183,13 +183,13 @@ class LibraryCe(object):
         if nuclide not in self._nuclides:
             raise Exception('%s not in cross_sections' % nuclide)
 
-        # Convert energy to MeV
+        # Convert energy to eV
         if energy_unit == 'eV':
-            emax = emax_eV_MeV * 1e-6
-            emin = emin_eV_MeV * 1e-6
-        else:
             emax = emax_eV_MeV
             emin = emin_eV_MeV
+        else:
+            emax = emax_eV_MeV * 1e6
+            emin = emin_eV_MeV * 1e6
 
         # Compute number of hyper-fine energy groups
         n = int(log(emax / emin) / dmu)
@@ -212,6 +212,7 @@ class LibraryCe(object):
             acelib = self.get_xs_by_kT_grp(f, nuclide, kT_grps[ii],
                                            has_res_fis)
             hflib = SDLibrary_interpEnergy(acelib, emax, emin, n, has_res_fis)
+            del acelib
         else:
             # Find temperature interpolation index
             i0, i1 = _find_temp_interp_index(kT, kTs)
@@ -224,12 +225,13 @@ class LibraryCe(object):
             hflib = SDLibrary_interpEnergyTemperature(
                 acelib0, acelib1, kTs[i0], kTs[i1], kT, emax, emin, n,
                 has_res_fis)
+            del acelib0, acelib1
 
         f.close()
 
         return hflib
 
-    def get_xs_by_kT_grp(self, f, nuclide, kT_grp, has_res_fis):
+    def get_xs_by_kT_grp(self, f, nuclide, kT_grp, has_res_fis, getsdlib=True):
         # Energy points
         energy = f[nuclide]['energy'][kT_grp].value
         n_energy = len(energy)
@@ -239,6 +241,8 @@ class LibraryCe(object):
         xs_sca = np.zeros(n_energy)
         if has_res_fis:
             xs_fis = np.zeros(n_energy)
+        else:
+            xs_fis = None
         for reaction in f[nuclide]['reactions']:
             mt = int(reaction[9:12])
             xs = f[nuclide]['reactions'][reaction][kT_grp]['xs']
@@ -253,17 +257,17 @@ class LibraryCe(object):
                 if _is_fission(mt):
                     xs_fis[i:i+n] += xs.value
 
-        acelib = SDLibrary()
-        acelib.setPotential(average_potential(nuclide))
-        acelib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
-        acelib.setEnergy(energy)
-        acelib.setXsTotal(xs_tot)
-        acelib.setXsScatter(xs_sca)
-        if has_res_fis:
-            acelib.setXsFission(xs_fis)
-        return acelib
-
-
-if __name__ == '__main__':
-    lib = LibraryCe(os.getenv('OPENMC_CROSS_SECTIONS'))
-    lib.get_nuclide('U238', 293.6, 9118.0, 4.0, False)
+        if getsdlib:
+            acelib = SDLibrary()
+            acelib.setPotential(average_potential(nuclide))
+            acelib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
+            acelib.setEnergy(energy)
+            acelib.setXsTotal(xs_tot)
+            acelib.setXsScatter(xs_sca)
+            if has_res_fis:
+                acelib.setXsFission(xs_fis)
+            return acelib
+        else:
+            return {'potential': average_potential(nuclide), 'awr':
+                    f[nuclide].attrs['atomic_weight_ratio'], 'energy': energy,
+                    'xs_tot': xs_tot, 'xs_sca': xs_sca, 'xs_fis': xs_fis}
