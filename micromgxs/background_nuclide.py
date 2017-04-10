@@ -24,6 +24,10 @@ def build_background_library(cross_sections, bnuc_file,
     else:
         bnuc_root = et.Element('cross_sections')
 
+    # Version of the library
+    with h5py.File(bnuc_file) as f:
+        f.attrs['version'] = [1, 0]
+
     # Process each nuclide
     for library in root:
         if library.attrib['type'] == 'neutron':

@@ -17,15 +17,12 @@ _MICROMGLIB = os.path.join(os.getenv('HOME'),
 def plot_adjust_sub_level():
 
     nuclide = 'U238'
-    # temps = [1190.0, 1140.0, 1100.0, 1060.0, 1010.0, 970.0, 930.0, 890.0,
-    #          860.0, 820.0]
     temps = [1190.0, 1100.0, 970.0, 890.0, 820.0]
-    # temps = [293.6]
     ave_temp = 975.0
     alltemps = deepcopy(temps)
     alltemps.append(ave_temp)
     cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
-    ig = 15
+    ig = 26
     savefig = 'adjust_level_error_%i.png' % (ig+1)
 
     # Load micro library
@@ -57,12 +54,57 @@ def plot_adjust_sub_level():
             error[ib] = (np.sum(pt['sub_abs'] * sub_flux) / np.sum(sub_flux) -
                          rx['res_abs'][ib]) / rx['res_abs'][ib] * 100.0
         plt.plot(rx['dilutions'], error, '-o', label='%s K' % temp)
-    plt.xlabel('dilution / barn')
-    plt.ylabel('absorption XS errro / %')
+    plt.xlabel('dilution (barn)')
+    plt.ylabel('absorption XS errro (%)')
     plt.xscale('log')
     plt.legend()
     plt.savefig(savefig)
     # plt.show()
+
+
+def test_294():
+    # OpenMC cross sections
+    cross_sections = os.getenv('JEFF_CROSS_SECTIONS')
+    # Define materials
+    fuel = Material(temperature=975.0, nuclides=['U238'],
+                    densities=[2.21546e-2], name='fuel')
+    mod = Material(temperature=600.0, nuclides=['H1'], densities=[0.0662188],
+                   name='moderator')
+    # Load micro library
+    lib = LibraryMicro()
+    lib.load_from_h5(_MICROMGLIB)
+    # Define a pin cell
+    pin = PinCell()
+    pin.pin_type = PINCELLBOX
+    pin.pitch = 1.26
+    pin.materials = [fuel, mod]
+    pin.radii = [
+        # 0.129653384067,
+        # 0.183357574155,
+        # 0.224566248577,
+        # 0.259306768134,
+        # 0.289913780286,
+        # 0.317584634389,
+        # 0.343030610879,
+        # 0.36671514831,
+        # 0.388960152201,
+        0.41
+    ]
+    # pin.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    pin.mat_fill = [0, 1]
+    # sub = ResonancePinSubgroup(first_calc_g=19, last_calc_g=20)
+    sub = ResonancePinSubgroup()
+    sub.pin_cell = pin
+    sub.pin_solver = PinFixSolver()
+    sub.pin_solver.n_ring_fuel = 20
+    sub.micro_lib = lib
+    sub.cross_sections = cross_sections
+    sub.use_pseudo_lib = True
+    sub.sph = True
+    sub.mod_sph = True
+    sub.solve_onenuc_onetemp()
+    sub.print_self_shielded_xs(to_h5='simple-pin-294-sph.h5', to_screen=True)
+    sub.write_macro_xs('simple-pin-294-sph-macro.h5')
 
 
 def test_975():
@@ -94,7 +136,7 @@ def test_975():
         0.41
     ]
     pin.mat_fill = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-    # sub = ResonancePinSubgroup(first_calc_g=21, last_calc_g=22)
+    # sub = ResonancePinSubgroup(first_calc_g=19, last_calc_g=20)
     sub = ResonancePinSubgroup()
     sub.pin_cell = pin
     sub.pin_solver = PinFixSolver()
@@ -102,8 +144,11 @@ def test_975():
     sub.micro_lib = lib
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
+    sub.sph = True
+    sub.mod_sph = True
     sub.solve_onenuc_onetemp()
     sub.print_self_shielded_xs(to_h5='simple-pin-975.h5', to_screen=True)
+    sub.write_macro_xs('simple-pin-975-macro.h5')
 
 
 def test_partial_xs_fit_new(ig):
@@ -477,10 +522,12 @@ def test_sim_partial_xs():
     sub.micro_lib = lib
     sub.cross_sections = cross_sections
     sub.use_pseudo_lib = True
+    sub.mod_sph = True
+    sub.sph = True
     sub.solve_sim_partial_xs()
-    sub.print_self_shielded_xs(to_h5='simple-pin-sim-partial-xs.h5',
+    sub.print_self_shielded_xs(to_h5='simple-pin-sim-partial.h5',
                                to_screen=True)
-    sub.write_macro_xs('simple-pin-macro.h5')
+    sub.write_macro_xs('simple-pin-sim-partial-macro.h5')
 
 
 def test_partial_xs_fit():
@@ -677,12 +724,13 @@ def run_partial_xs_fit_new():
 if __name__ == '__main__':
     # recommend run with:
     # $ ... -s 0.005 -a 256
+    test_294()
     # test_975()
     # test_adjust_level()
     # test_partial_xs_fit()
     # test_partial_xs_fit_new(21)
     # run_partial_xs_fit_new()
-    test_sim_partial_xs()
+    # test_sim_partial_xs()
     # test_partial_xs_fit_var()
     # test_correlation()
     # test_correlation_variant()

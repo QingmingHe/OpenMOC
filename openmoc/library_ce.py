@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 import os
 import h5py
 import numpy as np
+from scipy.io import FortranFile
 from math import log, exp
 from bisect import bisect
 from potentials import average_potential
@@ -63,8 +64,8 @@ def _is_fission(mt):
 def _interp_erg(xs, emax, emin, n, has_res_fis):
     du = log(emax / emin) / n
     energy0 = xs['energy']
-    xs_abs0 = xs['xs_abs']
-    xs_ela0 = xs['xs_ela']
+    xs_tot0 = xs['xs_tot']
+    xs_sca0 = xs['xs_sca']
     if has_res_fis:
         xs_fis0 = xs['xs_fis']
 
@@ -72,15 +73,15 @@ def _interp_erg(xs, emax, emin, n, has_res_fis):
     e = emax * exp(-u)
     i1 = bisect(energy0, e)
     i0 = i1 - 1
-    xs_abs = np.zeros(n)
-    xs_ela = np.zeros(n)
+    xs_tot = np.zeros(n)
+    xs_sca = np.zeros(n)
     if has_res_fis:
         xs_fis = np.zeros(n)
-    for i in range(n):
+    for i in range(n-1, -1, -1):
         r0 = (energy0[i1] - e) / (energy0[i1] - energy0[i0])
         r1 = 1.0 - r0
-        xs_ela[i] = r0 * xs_ela0[i0] + r1 * xs_ela0[i1]
-        xs_abs[i] = r0 * xs_abs0[i0] + r1 * xs_abs0[i1]
+        xs_sca[i] = r0 * xs_sca0[i0] + r1 * xs_sca0[i1]
+        xs_tot[i] = r0 * xs_tot0[i0] + r1 * xs_tot0[i1]
         if has_res_fis:
             xs_fis[i] = r0 * xs_fis0[i0] + r1 * xs_fis0[i1]
 
@@ -93,9 +94,9 @@ def _interp_erg(xs, emax, emin, n, has_res_fis):
             i0 = i1 - 1
 
     if has_res_fis:
-        return {'xs_abs': xs_abs, 'xs_ela': xs_ela, 'xs_fis': xs_fis}
+        return {'xs_tot': xs_tot, 'xs_sca': xs_sca, 'xs_fis': xs_fis}
     else:
-        return {'xs_abs': xs_abs, 'xs_ela': xs_ela}
+        return {'xs_tot': xs_tot, 'xs_sca': xs_sca}
 
 
 def _interp_erg_temp(xs0, xs1, temp0, temp1, emax, emin, n, temp, has_res_fis):
@@ -104,10 +105,10 @@ def _interp_erg_temp(xs0, xs1, temp0, temp1, emax, emin, n, temp, has_res_fis):
     du = log(emax / emin) / n
     energy0 = xs0['energy']
     energy1 = xs1['energy']
-    xs_abs0 = xs0['xs_abs']
-    xs_abs1 = xs1['xs_abs']
-    xs_ela0 = xs0['xs_ela']
-    xs_ela1 = xs1['xs_ela']
+    xs_tot0 = xs0['xs_tot']
+    xs_tot1 = xs1['xs_tot']
+    xs_sca0 = xs0['xs_sca']
+    xs_sca1 = xs1['xs_sca']
     if has_res_fis:
         xs_fis0 = xs0['xs_fis']
         xs_fis1 = xs1['xs_fis']
@@ -118,27 +119,27 @@ def _interp_erg_temp(xs0, xs1, temp0, temp1, emax, emin, n, temp, has_res_fis):
     i0 = i1 - 1
     j1 = bisect(energy1, e)
     j0 = j1 - 1
-    xs_abs = np.zeros(n)
-    xs_ela = np.zeros(n)
+    xs_tot = np.zeros(n)
+    xs_sca = np.zeros(n)
     if has_res_fis:
         xs_fis = np.zeros(n)
-    for i in range(n):
+    for i in range(n-1, -1, -1):
         r0 = (energy0[i1] - e) / (energy0[i1] - energy0[i0])
         r1 = 1.0 - r0
-        xs_abs2 = r0 * xs_abs0[i0] + r1 * xs_abs0[i1]
-        xs_ela2 = r0 * xs_ela0[i0] + r1 * xs_ela0[i1]
+        xs_tot2 = r0 * xs_tot0[i0] + r1 * xs_tot0[i1]
+        xs_sca2 = r0 * xs_sca0[i0] + r1 * xs_sca0[i1]
         if has_res_fis:
             xs_fis2 = r0 * xs_fis0[i0] + r1 * xs_fis0[i1]
 
         r0 = (energy1[j1] - e) / (energy1[j1] - energy1[j0])
         r1 = 1.0 - r0
-        xs_abs3 = r0 * xs_abs1[j0] + r1 * xs_abs1[j1]
-        xs_ela3 = r0 * xs_ela1[j0] + r1 * xs_ela1[j1]
+        xs_tot3 = r0 * xs_tot1[j0] + r1 * xs_tot1[j1]
+        xs_sca3 = r0 * xs_sca1[j0] + r1 * xs_sca1[j1]
         if has_res_fis:
             xs_fis3 = r0 * xs_fis1[j0] + r1 * xs_fis1[j1]
 
-        xs_abs[i] = rt0 * xs_abs2 + rt1 * xs_abs3
-        xs_ela[i] = rt0 * xs_ela2 + rt1 * xs_ela3
+        xs_tot[i] = rt0 * xs_tot2 + rt1 * xs_tot3
+        xs_sca[i] = rt0 * xs_sca2 + rt1 * xs_sca3
         if has_res_fis:
             xs_fis[i] = rt0 * xs_fis2 + rt1 * xs_fis3
 
@@ -156,9 +157,9 @@ def _interp_erg_temp(xs0, xs1, temp0, temp1, emax, emin, n, temp, has_res_fis):
             j0 = j1 - 1
 
     if has_res_fis:
-        return {'xs_abs': xs_abs, 'xs_ela': xs_ela, 'xs_fis': xs_fis}
+        return {'xs_tot': xs_tot, 'xs_sca': xs_sca, 'xs_fis': xs_fis}
     else:
-        return {'xs_abs': xs_abs, 'xs_ela': xs_ela}
+        return {'xs_tot': xs_tot, 'xs_sca': xs_sca}
 
 
 class LibraryCe(object):
@@ -230,6 +231,63 @@ class LibraryCe(object):
         f.close()
 
         return hflib
+
+    def to_rmet21_xs_file(self, fname, nuclide, temp, npft, ni, emax, emin,
+                          has_res_fis, find_nearest_temp=True):
+        f = h5py.File(self._nuclides[nuclide]['path'])
+
+        # Get temperatures in file
+        kT = temp * _K_BOLTZMANN
+        kTs = []
+        kT_grps = []
+        for grp in f[nuclide]['kTs']:
+            kT_grps.append(grp)
+            kTs.append(f[nuclide]['kTs'][grp].value)
+
+        if find_nearest_temp:
+            # Find nearest temperature point
+            ii = (np.abs(np.array(kTs) - kT)).argmin()
+
+            # Only energy point interpolation
+            acelib = self.get_xs_by_kT_grp(f, nuclide, kT_grps[ii], has_res_fis,
+                                           getsdlib=False)
+            attrs = {'awr': acelib['awr'], 'potential': acelib['potential']}
+            xs = _interp_erg(acelib, emax, emin, npft, has_res_fis)
+        else:
+            # Find temperature interpolation index
+            i0, i1 = _find_temp_interp_index(kT, kTs)
+
+            # Temperature interpolation and energy point interpolation
+            acelib0 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i0],
+                                            has_res_fis, getsdlib=False)
+            acelib1 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
+                                            has_res_fis, getsdlib=False)
+            attrs = {'awr': acelib0['awr'], 'potential': acelib0['potential']}
+            xs = _interp_erg_temp(acelib0, acelib1, kTs[i0], kTs[i1], emax,
+                                  emin, npft, kT, has_res_fis)
+
+        f.close()
+
+        # Write to XS file
+        with FortranFile(fname, 'w') as f:
+            if has_res_fis:
+                fis_flag = 1
+            else:
+                fis_flag = 0
+            f.write_record(np.array([npft, fis_flag, ni], dtype=np.int32))
+            f.write_record(np.array([log(emax / emin) / npft],
+                                    dtype=np.float32))
+            f.write_record(np.array([emax], dtype=np.float32))
+            ii = 0
+            for i in range(npft / ni):
+                f.write_record(np.float32(xs['xs_tot'][ii:ii+ni] -
+                                          xs['xs_sca'][ii:ii+ni]))
+                f.write_record(np.float32(xs['xs_sca'][ii:ii+ni]))
+                if has_res_fis:
+                    f.write_record(np.float32(xs['xs_fis'][ii:ii+ni]))
+                ii += ni
+
+        return attrs
 
     def get_xs_by_kT_grp(self, f, nuclide, kT_grp, has_res_fis, getsdlib=True):
         # Energy points

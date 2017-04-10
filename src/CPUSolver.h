@@ -56,7 +56,8 @@ public:
    * @param fsr_flux a pointer to the temporary FSR scalar flux buffer
    */
   virtual void tallyScalarFlux(segment* curr_segment, int azim_index,
-                               FP_PRECISION* track_flux, FP_PRECISION* fsr_flux);
+                               FP_PRECISION* track_flux, FP_PRECISION* fsr_flux,
+                               segment* last_segment, segment* next_segment);
 
   /**
    * @brief Computes the contribution to surface current from a segment.
@@ -105,5 +106,6 @@ public:
   void computeFSRFissionRates(double* fission_rates, int num_FSRs);
 };
 
+int getNextMatIndex(segment* next_segment, segment* curr_segment);
 
 #endif /* CPUSOLVER_H_ */

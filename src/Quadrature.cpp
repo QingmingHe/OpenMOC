@@ -758,6 +758,14 @@ void Quadrature::precomputeWeights(bool solve_3D) {
                             * _azim_spacings[a] * _polar_weights[a][p];
       weight *= 2.0 * _sin_thetas[a][p];
       setPolarValues(_total_weights, a, p, weight);
+      /* std::cout << a << " " */
+      /*           << p << " " */
+      /*           << _azim_weights[a] << " " */
+      /*           << _azim_spacings[a] << " " */
+      /*           << _polar_weights[a][p] << " " */
+      /*           << _sin_thetas[a][p] << " " */
+      /*           << weight << " " */
+      /*           << std::endl; */
     }
   }
 }

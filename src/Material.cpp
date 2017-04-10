@@ -77,6 +77,17 @@ Material::Material(int id, const char* name) {
 
   _data_aligned = false;
 
+  _n_df = 0;
+  _num_neib = 0;
+  _num_azim = 0;
+  _num_polar = 0;
+  _num_next_mat = 0;
+  _next_mat_id = NULL;
+  _current_ou_ref = NULL;
+  _current_ou = NULL;
+  _df_ou = NULL;
+  _df_ou_last = NULL;
+
   return;
 }
 
@@ -108,6 +119,17 @@ Material::~Material() {
 
     if (_fiss_matrix != NULL)
       MM_FREE(_fiss_matrix);
+
+    if (_next_mat_id != NULL)
+      MM_FREE(_next_mat_id);
+    if (_current_ou_ref != NULL)
+      MM_FREE(_current_ou_ref);
+    if (_current_ou != NULL)
+      MM_FREE(_current_ou);
+    if (_df_ou != NULL)
+      MM_FREE(_df_ou);
+    if (_df_ou_last != NULL)
+      MM_FREE(_df_ou_last);
   }
 
   /* Data is not vector aligned */
@@ -129,6 +151,17 @@ Material::~Material() {
 
     if (_fiss_matrix != NULL)
       delete [] _fiss_matrix;
+
+    if (_next_mat_id != NULL)
+      delete [] _next_mat_id;
+    if (_current_ou_ref != NULL)
+      delete [] _current_ou_ref;
+    if (_current_ou != NULL)
+      delete [] _current_ou;
+    if (_df_ou != NULL)
+      delete [] _df_ou;
+    if (_df_ou_last != NULL)
+      delete [] _df_ou_last;
   }
 }
 
@@ -493,6 +526,15 @@ void Material::setNumEnergyGroups(const int num_groups) {
 
     if (_chi != NULL)
       MM_FREE(_chi);
+
+    if (_current_ou_ref != NULL)
+      MM_FREE(_current_ou_ref);
+    if (_current_ou != NULL)
+      MM_FREE(_current_ou);
+    if (_df_ou_last != NULL)
+      MM_FREE(_df_ou_last);
+    if (_df_ou != NULL)
+      MM_FREE(_df_ou);
   }
 
   /* Data is not vector aligned */
@@ -511,6 +553,15 @@ void Material::setNumEnergyGroups(const int num_groups) {
 
     if (_chi != NULL)
       delete [] _chi;
+
+    if (_current_ou_ref != NULL)
+      delete [] _current_ou_ref;
+    if (_current_ou != NULL)
+      delete [] _current_ou;
+    if (_df_ou_last != NULL)
+      delete [] _df_ou_last;
+    if (_df_ou != NULL)
+      delete [] _df_ou;
   }
 
   /* Allocate memory for data arrays */
@@ -853,6 +904,64 @@ void Material::setChiByGroup(double xs, int group) {
               "%d which contains %d energy groups", group, _id, _num_groups);
 
   _chi[group-1] = xs;
+}
+
+
+void Material::setDFNumParams(int num_neib, int num_azim, int num_groups,
+                              int num_polar, int num_next_mat) {
+
+  int n = num_neib * num_azim * num_groups * num_polar;
+
+  if (_num_groups != num_groups)
+    log_printf(ERROR, "Unable to set chi with %d groups for Material "
+               "%d which contains %d energy groups", num_groups, _id, _num_groups);
+
+  _n_df = n;
+  _num_neib = num_neib;
+  _num_azim = num_azim;
+  _num_polar = num_polar;
+  _num_next_mat = num_next_mat;
+  _next_mat_id = new int [num_next_mat];
+  _current_ou_ref = new FP_PRECISION[n];
+  _current_ou = new FP_PRECISION[n];
+  _df_ou = new FP_PRECISION[n];
+  _df_ou_last = new FP_PRECISION[n];
+  memset(_next_mat_id, 0, sizeof(int) * num_next_mat);
+  memset(_current_ou_ref, 0.0, sizeof(FP_PRECISION) * n);
+  memset(_current_ou, 0.0, sizeof(FP_PRECISION) * n);
+  std::fill_n(_df_ou, n, 1.0);
+  std::fill_n(_df_ou_last, n, 1.0);
+
+}
+
+
+FP_PRECISION Material::getDF(int neib, int azim, int group, int polar) {
+  return _df_ou[neib * _num_azim * _num_groups * _num_polar +
+                azim * _num_groups * _num_polar + group * _num_polar + polar];
+}
+
+
+int Material::getDFIndex(int neib, int azim, int group, int polar) {
+  return neib * _num_azim * _num_groups * _num_polar + azim * _num_groups *
+    _num_polar + group * _num_polar + polar;
+}
+
+
+void Material::setCurrentOut(double* current, int n) {
+  for (int i = 0; i < n; i++)
+    _current_ou_ref[i] = current[i];
+}
+
+
+void Material::setDF(double* df, int n) {
+  for (int i = 0; i < n; i++)
+    _df_ou[i] = df[i];
+}
+
+
+void Material::setNextMatId(int* next_mat_id, int n) {
+  for (int i = 0; i < n; i++)
+    _next_mat_id[i] = next_mat_id[i];
 }
 
 

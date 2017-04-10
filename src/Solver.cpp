@@ -41,6 +41,8 @@ Solver::Solver(TrackGenerator* track_generator) {
   _user_fluxes = false;
 
   _timer = new Timer();
+
+  _calc_df = 0;
 }
 
 
@@ -792,6 +794,16 @@ void Solver::computeFlux(int max_iters, solverMode mode,
   /* Source iteration loop */
   for (int i=0; i < max_iters; i++) {
 
+    /* Set partial current to be zero */
+    if (_calc_df == 1) {
+      for (int r = 0; r < _num_FSRs; r++) {
+        if (_FSR_materials[r]->_n_df != 0) {
+          memset(_FSR_materials[r]->_current_ou, 0.0,
+                 sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
+        }
+      }
+    }
+
     transportSweep();
     addSourceToScalarFlux();
     residual = computeResidual(SCALAR_FLUX);
@@ -847,7 +859,7 @@ void Solver::iterateScattSource(int max_iters, solverMode mode) {
 
   /* Initialize new flux arrays */
   initializeFluxArrays();
-  flattenFSRFluxes(0.0);
+  flattenFSRFluxes(1.0);
   storeFSRFluxes();
 
   initializeSourceArrays();
@@ -877,6 +889,11 @@ void Solver::iterateScattSource(int max_iters, solverMode mode) {
 
   _timer->stopTimer();
   _timer->recordSplit("Total time");
+}
+
+
+void Solver::setCalcDF(int calc_df) {
+  _calc_df = calc_df;
 }
 
 
@@ -957,6 +974,16 @@ void Solver::computeSource(int max_iters, solverMode mode,
   /* Source iteration loop */
   for (int i=0; i < max_iters; i++) {
 
+    /* Set partial current to be zero */
+    if (_calc_df == 1) {
+      for (int r = 0; r < _num_FSRs; r++) {
+        if (_FSR_materials[r]->_n_df != 0) {
+          memset(_FSR_materials[r]->_current_ou, 0.0,
+                 sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
+        }
+      }
+    }
+
     computeFSRSources();
     transportSweep();
     addSourceToScalarFlux();
@@ -978,6 +1005,85 @@ void Solver::computeSource(int max_iters, solverMode mode,
 
   _timer->stopTimer();
   _timer->recordSplit("Total time");
+}
+
+
+void Solver::computeDF(int max_iters, solverMode mode, double k_eff,
+                       residualType res_type, int df_mode) {
+
+  FP_PRECISION max_df_res;
+
+  for (int i = 0; i < max_iters; i++) {
+    log_printf(TITLE, "DF Iteration %d", i);
+    if (df_mode == 0)
+      computeSource(max_iters, mode, k_eff, res_type);
+    else
+      computeFlux(max_iters, mode, true);
+
+    /* Compute discontinuity factor */
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->_n_df != 0) {
+        for (int j = 0; j < _FSR_materials[r]->_n_df; j++) {
+          /* FP_PRECISION ratio = 0.8; */
+          _FSR_materials[r]->_df_ou[j] =
+            _FSR_materials[r]->_current_ou_ref[j] /
+            _FSR_materials[r]->_current_ou[j];
+          /* _FSR_materials[r]->_df_ou[j] = */
+          /*   ratio * _FSR_materials[r]->_df_ou[j] + */
+          /*   (1.0 - ratio) * _FSR_materials[r]->_df_ou_last[j]; */
+          /* _FSR_materials[r]->_df_ou[j] = 1.0; */
+        }
+      }
+    }
+    std::cout << "fuel" << std::endl;
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->getId() == 10000) {
+        for (int j = 0; j < _FSR_materials[r]->_n_df; j++) {
+          std::cout << _FSR_materials[r]->_df_ou[j] << std::endl;
+        }
+        break;
+      }
+    }
+    std::cout << "moderator" << std::endl;
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->getId() == 1) {
+        for (int j = 0; j < _FSR_materials[r]->_n_df; j++) {
+          std::cout << _FSR_materials[r]->_df_ou[j] << std::endl;
+        }
+        break;
+      }
+    }
+
+    /* Check for convergence */
+    if (i > 0) {
+      max_df_res = 0.0;
+      for (int r = 0; r < _num_FSRs; r++) {
+        if (_FSR_materials[r]->_n_df != 0) {
+          for (int j = 0; j < _FSR_materials[r]->_n_df; j++) {
+            FP_PRECISION val;
+              val = _FSR_materials[r]->_df_ou_last[j] -
+              _FSR_materials[r]->_df_ou[j];
+            val = (val > 0.0) ? val : -val;
+            if (max_df_res < val)
+              max_df_res = val;
+          }
+        }
+      }
+      if (max_df_res < 1e-5)
+        break;
+      /* if (i == 1) */
+      /*   break; */
+    }
+
+    /* Store discontinuity factor */
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->_n_df != 0) {
+        for (int j = 0; j < _FSR_materials[r]->_n_df; j++) {
+          _FSR_materials[r]->_df_ou_last[j] = _FSR_materials[r]->_df_ou[j];
+        }
+      }
+    }
+  }
 }
 
 

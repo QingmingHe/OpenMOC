@@ -104,6 +104,8 @@ class ResonancePinSubgroup(object):
         self._first_calc_g = first_calc_g
         self._last_calc_g = last_calc_g
         self._pin_cell_ave = pin_cell_ave
+        self._sph = False
+        self._mod_sph = False
 
         self._pseudo_lib = None
         self._pseudo_libs = None
@@ -364,44 +366,44 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * pt_ave['sub_wgt'][ib]
+                        * pt_ave['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
-    def _calc_xs_shape_ratio(self, ig, nuc, resnuc_xs, apply_ratio=True):
+    def _apply_correction_factor(self, ig):
         jg = ig - self._micro_lib.first_res
-        n_res = self._micro_lib.last_res - self._micro_lib.first_res
-        if 'ratio_shape_abs' not in self._resnuc_xs[nuc]:
-            self._resnuc_xs[nuc]['ratio_shape_abs'] = np.ones(n_res)
-            self._resnuc_xs[nuc]['ratio_shape_tot'] = np.ones(n_res)
-            self._resnuc_xs[nuc]['ratio_shape_sca'] = np.ones(n_res)
+        for nuc in self._resnuc_xs:
+            resnuc = self._resnuc_xs[nuc]
+            resnuc['xs_abs'][jg, :self._n_res_reg] \
+                *= resnuc['factor_abs'][jg, :self._n_res_reg]
+            resnuc['xs_tot'][jg, :self._n_res_reg] \
+                *= resnuc['factor_tot'][jg, :self._n_res_reg]
+            resnuc['xs_sca'][jg, :self._n_res_reg] \
+                *= resnuc['factor_sca'][jg, :self._n_res_reg]
             if self._micro_lib.has_resfis(nuc):
-                self._resnuc_xs[nuc]['ratio_shape_nfi'] = np.ones(n_res)
-        self._resnuc_xs[nuc]['ratio_shape_abs'] \
+                resnuc['xs_nfi'][jg, :self._n_res_reg] \
+                    *= resnuc['factor_nfi'][jg, :self._n_res_reg]
+
+    def _calc_xs_shape_factor(self, ig, nuc, resnuc_xs):
+        jg = ig - self._micro_lib.first_res
+        self._resnuc_xs[nuc]['factor_abs'][jg, :] \
             = resnuc_xs[nuc]['xs_abs'][jg, self._n_res_reg] \
             / self._resnuc_xs[nuc]['xs_abs'][jg, self._n_res_reg]
-        self._resnuc_xs[nuc]['ratio_shape_tot'] \
+        self._resnuc_xs[nuc]['factor_tot'][jg, :] \
             = resnuc_xs[nuc]['xs_tot'][jg, self._n_res_reg] \
             / self._resnuc_xs[nuc]['xs_tot'][jg, self._n_res_reg]
-        self._resnuc_xs[nuc]['ratio_shape_sca'] \
+        self._resnuc_xs[nuc]['factor_sca'][jg, :] \
             = resnuc_xs[nuc]['xs_sca'][jg, self._n_res_reg] \
             / self._resnuc_xs[nuc]['xs_sca'][jg, self._n_res_reg]
         if self._micro_lib.has_resfis(nuc):
-            self._resnuc_xs[nuc]['ratio_shape_nfi'] \
+            self._resnuc_xs[nuc]['factor_nfi'][jg, :] \
                 = resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg] \
                 / self._resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg]
-        if apply_ratio:
-            resnuc = self._resnuc_xs[nuc]
-            resnuc['xs_abs'] *= resnuc['ratio_shape_abs']
-            resnuc['xs_tot'] *= resnuc['ratio_shape_tot']
-            resnuc['xs_sca'] *= resnuc['ratio_shape_sca']
-            if self._micro_lib.has_resfis(nuc):
-                resnuc['xs_nfi'] *= resnuc['ratio_shape_nfi']
 
     def write_macro_xs(self, fname):
         f = h5py.File(fname, 'w')
+        f.attrs['# groups'] = self._micro_lib.ng
 
         n_region = len(self._pin_cell.mat_fill)
         for ireg in range(n_region):
@@ -442,16 +444,24 @@ class ResonancePinSubgroup(object):
                                 xs['nufis'] / xs['nu']
                             xs_nfi[ig] += mat.densities[inuc] * xs['nufis']
                     else:
-                        xs_tot[ig] += mat.densities[inuc] * xs['total']
+                        if self._mod_sph and ig >= self._micro_lib.first_res \
+                           and ig < self._micro_lib.last_res:
+                            sph = self._sph_factors[jg, ireg]
+                        else:
+                            sph = 1.0
+                        xs_tot[ig] += mat.densities[inuc] * xs['total'] * sph
                         xs_sca[ig, :] += mat.densities[inuc] * \
-                            xs['scatter_matrix_0']
-                        xs_fis[ig] += mat.densities[inuc] * xs['fission']
-                        xs_nfi[ig] += mat.densities[inuc] * xs['nufis']
+                            xs['scatter_matrix_0'] * sph
+                        xs_fis[ig] += mat.densities[inuc] * xs['fission'] * sph
+                        xs_nfi[ig] += mat.densities[inuc] * xs['nufis'] * sph
 
             # Write the xs to file
+            # TODO very special case for multi-group fixed-source calculation
+            xs_fis[:] = 0.0
+            xs_nfi[:] = 0.0
             f['/material/%i/total' % ireg] = xs_tot
             f['/material/%i/fission' % ireg] = xs_fis
-            f['/material/%i/nu_fission' % ireg] = xs_nfi
+            f['/material/%i/nu-fission' % ireg] = xs_nfi
             f['/material/%i/scatter matrix' % ireg] = xs_sca.flatten()
 
     def solve_sim_partial_xs(self):
@@ -553,14 +563,83 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * pt_ave['sub_wgt'][ib]
+                        * pt_ave['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
                 # Calculate XS shape correction factor
-                self._calc_xs_shape_ratio(ig, res_nuc, ave_solver.resnuc_xs)
+                self._calc_xs_shape_factor(ig, res_nuc, ave_solver.resnuc_xs)
+
+                # SPH correction
+                if self._sph:
+                    self._calc_sph_correction(sub_flux, ig, res_nuc)
+
+                # Apply XS correction factor
+                self._apply_correction_factor(ig)
+
+    def _calc_sph_correction(self, sub_flux, ig, res_nuc):
+        flux = np.sum(sub_flux, 0)
+        jg = ig - self._micro_lib.first_res
+        n_region = len(self._pin_cell.mat_fill)
+        mac_tot = np.zeros(n_region)
+        mac_sca = np.zeros(n_region)
+        mac_src = np.zeros(n_region)
+        for ireg in range(n_region):
+            imat = self._pin_cell.mat_fill[ireg]
+            mat = self._pin_cell.materials[imat]
+            for inuc, nuc in enumerate(mat.nuclides):
+                xs_typ = self._micro_lib.get_typical_xs(
+                    nuc, mat.temperature, ig, 'total', 'scatter', 'potential',
+                    'lambda')
+                if nuc == res_nuc:
+                    mac_tot[ireg] += self._resnuc_xs[nuc]['xs_tot'][jg, ireg] \
+                        * mat.densities[inuc]
+                    mac_sca[ireg] += self._resnuc_xs[nuc]['xs_sca'][jg, ireg] \
+                        * mat.densities[inuc] * (1.0 - xs_typ['lambda'])
+                    mac_src[ireg] += xs_typ['lambda'] * xs_typ['potential'] \
+                        * mat.densities[inuc]
+                else:
+                    mac_tot[ireg] += xs_typ['total'] * mat.densities[inuc]
+                    mac_sca[ireg] += xs_typ['scatter'] * mat.densities[inuc] \
+                        * (1.0 - xs_typ['lambda'])
+                    mac_src[ireg] += xs_typ['lambda'] * xs_typ['potential'] \
+                        * mat.densities[inuc]
+
+        sph = np.ones(n_region)
+        n_iter = 0
+        while True:
+
+            n_iter += 1
+            if n_iter == 20:
+                break
+
+            mac_tot_tmp = mac_tot * sph
+            mac_sca_tmp = mac_sca * sph
+
+            self._pin_solver.set_pin_xs(xs_tot=mac_tot_tmp, xs_sca=mac_sca_tmp,
+                                        source=mac_src)
+            self._pin_solver.solve()
+            flux_tmp = self._pin_solver.flux * self._pin_solver.vols
+
+            sph_tmp = flux / flux_tmp
+            sph_err = abs(sph - sph_tmp)
+            sph = sph_tmp
+            if np.max(sph_err) < 1e-4:
+                break
+        print(n_iter)
+        print(" ".join([str(val) for val in sph]))
+
+        self._sph_factors[jg, :] = sph[:]
+        self._resnuc_xs[res_nuc]['factor_abs'][jg, :self._n_res_reg] \
+            *= sph[:self._n_res_reg]
+        self._resnuc_xs[res_nuc]['factor_tot'][jg, :self._n_res_reg] \
+            *= sph[:self._n_res_reg]
+        self._resnuc_xs[res_nuc]['factor_sca'][jg, :self._n_res_reg] \
+            *= sph[:self._n_res_reg]
+        if self._micro_lib.has_resfis(res_nuc):
+            self._resnuc_xs[res_nuc]['factor_nfi'][jg, :self._n_res_reg] \
+                *= sph[:self._n_res_reg]
 
     def solve_partial_xs_fit(self):
         if self._pin_cell.ave_temp is None:
@@ -650,11 +729,10 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * pt_ave['sub_wgt'][ib]
+                        * pt_ave['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
     def solve_correlation_variant(self):
         if self._pin_cell.ave_temp is None:
@@ -752,7 +830,7 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * pt_ave['sub_wgt'][ib]
+                        * pt_ave['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Unify subgroup flux
                 pt_ave['sub_flx'] = sub_flux
@@ -762,8 +840,7 @@ class ResonancePinSubgroup(object):
                 pts = pts[0:self._n_res_reg]
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
     def solve_adjust_numdens(self):
         # Solve problem at effective temperature
@@ -876,11 +953,10 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * subp['sub_wgt'][ib]
+                        * subp['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
     def solve_correlation(self):
         if self._pin_cell.ave_temp is None:
@@ -980,11 +1056,10 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * subp['sub_wgt'][ib]
+                        * subp['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
     def solve_adjust_sub_level(self):
         if self._pin_cell.ave_temp is None:
@@ -1090,11 +1165,10 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * subp['sub_wgt'][ib]
+                        * subp['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pts=pts)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pts=pts)
 
     def solve_onenuc_onetemp(self):
         # Set pin geometry
@@ -1191,11 +1265,17 @@ class ResonancePinSubgroup(object):
                                                 source=mac_src)
                     self._pin_solver.solve()
                     sub_flux[ib, :] = self._pin_solver.flux \
-                        * subp['sub_wgt'][ib]
+                        * subp['sub_wgt'][ib] * self._pin_solver.vols
 
                 # Condense self-shielded xs
-                self._condense_self_shielded_xs(
-                    ig, res_nuc, sub_flux, self._pin_solver.vols, pt=subp)
+                self._condense_self_shielded_xs(ig, res_nuc, sub_flux, pt=subp)
+
+                # SPH correction
+                if self._sph:
+                    self._calc_sph_correction(sub_flux, ig, res_nuc)
+
+                # Apply XS correction factor
+                self._apply_correction_factor(ig)
 
     def _init_plib_one_nuc_multi_temp(self, nuclide, density, temperatures,
                                       ave_temp):
@@ -1287,13 +1367,24 @@ class ResonancePinSubgroup(object):
                     self._resnuc_xs[nuc]['xs_nfi'][jg, self._n_res_reg] \
                         = self._resnuc_xs[nuc]['xs_nfi'][jg, 0]
 
-    def _condense_self_shielded_xs(self, ig, nuc, sub_flux, vols, pt=None,
-                                   pts=None):
+        # Initialize SPH factors
+        self._sph_factors = np.ones((n_res, n_region))
+
+        # Initialize correction factors
+        for nuc in self._resnuc_xs:
+            self._resnuc_xs[nuc]['factor_abs'] \
+                = np.ones((n_res, self._n_res_reg))
+            self._resnuc_xs[nuc]['factor_tot'] \
+                = np.ones((n_res, self._n_res_reg))
+            self._resnuc_xs[nuc]['factor_sca'] \
+                = np.ones((n_res, self._n_res_reg))
+            if self._micro_lib.has_resfis(nuc):
+                self._resnuc_xs[nuc]['factor_nfi'] \
+                    = np.ones((n_res, self._n_res_reg))
+
+    def _condense_self_shielded_xs(self, ig, nuc, sub_flux, pt=None, pts=None):
         jg = ig - self._micro_lib.first_res
         n = self._n_res_reg
-        n_band = sub_flux.shape[0]
-        for ib in range(n_band):
-            sub_flux[ib, :] *= vols[:]
         flux = np.sum(sub_flux, 0)
         sum_flux = np.sum(flux[0:n])
         self._flux[jg, :] = flux[:]
@@ -1431,6 +1522,22 @@ class ResonancePinSubgroup(object):
         self._last_calc_g = last_calc_g
 
     @property
+    def sph(self):
+        return self._sph
+
+    @sph.setter
+    def sph(self, sph):
+        self._sph = sph
+
+    @property
+    def mod_sph(self):
+        return self._mod_sph
+
+    @mod_sph.setter
+    def mod_sph(self, mod_sph):
+        self._mod_sph = mod_sph
+
+    @property
     def pin_cell_ave(self):
         return self._pin_cell_ave
 
@@ -1478,7 +1585,7 @@ class PinFixSolver(object):
         self._pin_type = None
         self._radii = None
         self._pitch = None
-        self._n_ring_fuel = 10
+        self._n_ring_fuel = 20
         self._n_ring_fuel_mat = None
         self._n_sector_fuel = 1
         self._n_sector_mod = 8
@@ -1632,7 +1739,8 @@ class PinFixSolver(object):
 
         # Solver the fixed source problem with scattering iteration
         # self._moc_solver.iterateScattSource()
-        self._moc_solver.computeSource(self._moc_opts.max_iters)
+        self._moc_solver.computeSource(self._moc_opts.max_iters,
+                                       res_type=openmoc.SCALAR_FLUX)
         fsr_fluxes = get_scalar_fluxes(self._moc_solver)
 
         # Get the volumes

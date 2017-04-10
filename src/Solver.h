@@ -182,6 +182,9 @@ protected:
   /** A pointer to a Coarse Mesh Finite Difference (CMFD) acceleration object */
   Cmfd* _cmfd;
 
+  /* 0: no DF; 1: calculate DF; 2: apply DF */
+  int _calc_df;
+
   void clearTimerSplits();
 
 public:
@@ -218,6 +221,7 @@ public:
   void setExpPrecision(FP_PRECISION precision);
   void useExponentialInterpolation();
   void useExponentialIntrinsic();
+  void setCalcDF(int calc_df);
 
   virtual void initializeExpEvaluator();
   virtual void initializeMaterials(solverMode mode=FORWARD);
@@ -307,6 +311,9 @@ public:
   void iterateScattSource(int max_iters=1000, solverMode mode=FORWARD);
   void computeSource(int max_iters=1000, solverMode mode=FORWARD,
                      double k_eff=1.0, residualType res_type=TOTAL_SOURCE);
+  void computeDF(int max_iters=10, solverMode mode=FORWARD,
+                 double k_eff=1.0, residualType res_type=TOTAL_SOURCE,
+                 int df_mode=0);
   void computeEigenvalue(int max_iters=1000, solverMode mode=FORWARD,
                          residualType res_type=FISSION_SOURCE);
 

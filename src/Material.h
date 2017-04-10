@@ -98,6 +98,18 @@ private:
   int _num_vector_groups;
 
 public:
+
+  int _n_df;
+  int _num_neib;
+  int _num_azim;
+  int _num_polar;
+  int _num_next_mat;
+  int* _next_mat_id;
+  FP_PRECISION* _current_ou_ref;
+  FP_PRECISION* _current_ou;
+  FP_PRECISION* _df_ou;
+  FP_PRECISION* _df_ou_last;
+
   Material(int id=0, const char* name="");
   virtual ~Material();
 
@@ -118,6 +130,8 @@ public:
   FP_PRECISION getNuSigmaFByGroup(int group);
   FP_PRECISION getChiByGroup(int group);
   FP_PRECISION getFissionMatrixByGroup(int origin, int destination);
+  FP_PRECISION getDF(int neib, int azim, int group, int polar);
+  int getDFIndex(int neib, int azim, int group, int polar);
   bool isFissionable();
   bool isDataAligned();
   int getNumVectorGroups();
@@ -134,6 +148,11 @@ public:
   void setSigmaF(double* xs, int num_groups);
   void setNuSigmaF(double* xs, int num_groups);
   void setChi(double* xs, int num_groups);
+  void setDFNumParams(int num_neib, int num_azim, int num_groups, int num_polar,
+                      int num_next_mat);
+  void setCurrentOut(double* current, int n);
+  void setDF(double* df, int n);
+  void setNextMatId(int* next_mat_id, int n);
 
   void setSigmaTByGroup(double xs, int group);
   void setSigmaFByGroup(double xs, int group);

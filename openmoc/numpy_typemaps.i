@@ -39,6 +39,21 @@
  * number densities using NumPy arrays */
 %apply (double* IN_ARRAY1, int DIM1) {(double* num_dens, int n_case)}
 
+/* The typemap used to match the method signature for the Material
+ * current setter methods. This allows users to set the
+ * current using NumPy arrays */
+%apply (double* IN_ARRAY1, int DIM1) {(double* current, int n)}
+
+/* The typemap used to match the method signature for the Material
+ * discontinuity factors setter methods. This allows users to set the
+ * discontinuity factors using NumPy arrays */
+%apply (double* IN_ARRAY1, int DIM1) {(double* df, int n)}
+
+/* The typemap used to match the method signature for the Material
+ * next material id setter methods. This allows users to set the
+ * next material id using NumPy arrays */
+%apply (int* IN_ARRAY1, int DIM1) {(int* next_mat_id, int n)}
+
 /* The typemap used to match the method signature for the Cell rotation
  * angle setter method. This allows users to set the rotation angles
  * using NumPy arrays */
@@ -79,6 +94,11 @@
  * PolarQuad::setSinThetas method. This allows users to set the polar angle
  * quadrature sine thetas using a NumPy array */
 %apply (double* IN_ARRAY1, int DIM1) {(double* sin_thetas, int num_polar)}
+
+/* The typemap used to match the method signature for the
+ * PolarQuad::setThetas method. This allows users to set the polar angle
+ * quadrature sine thetas using a NumPy array */
+%apply (double* IN_ARRAY1, int DIM1) {(double* thetas, int num_azim_times_polar)}
 
 /* The typemap used to match the method signature for the
  * PolarQuad::setWeights method. This allows users to set the polar angle

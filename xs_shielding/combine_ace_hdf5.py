@@ -54,6 +54,6 @@ if __name__ == '__main__':
         = "/home/qingming/library/jeff-3.2-1.0/jeff-3.2-hdf5/cross_sections.xml"
     jeff_dir = os.path.dirname(cross_sections)
     u238_files = [os.path.join(jeff_dir, fname)
-                  for fname in ['U238.h5', 'U238new.h5']]
+                  for fname in ['U238.h5', 'U238_964.h5']]
     u238all = os.path.join(jeff_dir, 'U238all.h5')
     combine(u238_files, u238all)
