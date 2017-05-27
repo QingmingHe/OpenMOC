@@ -17,9 +17,9 @@ import subprocess
 from time import sleep
 
 RESONANCE_FISSION_USER = 2
-DEFAULT_BATCHES = 10
-DEFAULT_INACTIVE = 5
-DEFAULT_PARTICLES = 100
+DEFAULT_BATCHES = 1000
+DEFAULT_INACTIVE = 100
+DEFAULT_PARTICLES = 100000
 DEFAULT_RI_BATCHES = 100
 DEFAULT_RI_PARTICLES = 1000
 p = subprocess.Popen('hostname', shell=True, stdout=subprocess.PIPE,
@@ -1148,8 +1148,6 @@ class RItable(object):
         self._temperatures = opts.temperatures
         self._group_structure = opts.group_structure
         self._background_nuclide = opts.background_nuclide
-        self._batches = opts.batches
-        self._particles = opts.particles
         self._batches = opts.ri_batches
         self._particles = opts.ri_particles
         self._has_res = opts.has_res
@@ -1389,8 +1387,7 @@ class RItable(object):
 
 if __name__ == '__main__':
     lib_fname = 'jeff-3.2-wims69e-new.h5'
-    set_default_settings(batches=10, inactive=3,
-                         particles=50)
+    # set_default_settings(batches=10, inactive=3, particles=50)
     opts_list = []
 
     # Options for generating U238
