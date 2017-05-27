@@ -20,6 +20,8 @@ RESONANCE_FISSION_USER = 2
 DEFAULT_BATCHES = 10
 DEFAULT_INACTIVE = 5
 DEFAULT_PARTICLES = 100
+DEFAULT_RI_BATCHES = 100
+DEFAULT_RI_PARTICLES = 1000
 p = subprocess.Popen('hostname', shell=True, stdout=subprocess.PIPE,
                      stderr=subprocess.PIPE)
 _hostname = p.communicate()[0].strip()
@@ -57,14 +59,20 @@ def _run_openmc():
         openmc.run()
 
 
-def set_default_settings(batches=None, inactive=None, particles=None):
-    global DEFAULT_BATCHES, DEFAULT_INACTIVE, DEFAULT_PARTICLES
+def set_default_settings(batches=None, inactive=None, particles=None,
+                         ri_batches=None, ri_particles=None):
+    global DEFAULT_BATCHES, DEFAULT_INACTIVE, DEFAULT_PARTICLES,\
+        DEFAULT_RI_BATCHES, DEFAULT_RI_PARTICLES
     if batches is not None:
         DEFAULT_BATCHES = batches
     if inactive is not None:
         DEFAULT_INACTIVE = inactive
     if particles is not None:
         DEFAULT_PARTICLES = particles
+    if ri_batches is not None:
+        DEFAULT_RI_BATCHES = ri_batches
+    if ri_particles is not None:
+        DEFAULT_RI_PARTICLES = ri_particles
 
 
 def _get_potentials_from_endf(endf_path, potentials_fname):
@@ -164,6 +172,8 @@ class MicroMgXsOptions(object):
         self._batches = DEFAULT_BATCHES
         self._inactive = DEFAULT_INACTIVE
         self._particles = DEFAULT_PARTICLES
+        self._ri_batches = DEFAULT_RI_BATCHES
+        self._ri_particles = DEFAULT_RI_PARTICLES
         self._has_res = False
         self._has_resfis = False
         self._ri_use_openmc = False
@@ -177,6 +187,22 @@ class MicroMgXsOptions(object):
     @nuclide.setter
     def nuclide(self, nuclide):
         self._nuclide = nuclide
+
+    @property
+    def ri_batches(self):
+        return self._ri_batches
+
+    @ri_batches.setter
+    def ri_batches(self, ri_batches):
+        self._ri_batches = ri_batches
+
+    @property
+    def ri_particles(self):
+        return self._ri_particles
+
+    @ri_particles.setter
+    def ri_particles(self, ri_particles):
+        self._ri_particles = ri_particles
 
     @property
     def legendre_order(self):
@@ -1124,6 +1150,8 @@ class RItable(object):
         self._background_nuclide = opts.background_nuclide
         self._batches = opts.batches
         self._particles = opts.particles
+        self._batches = opts.ri_batches
+        self._particles = opts.ri_particles
         self._has_res = opts.has_res
         self._has_resfis = opts.has_resfis
         self._ri_use_openmc = opts.ri_use_openmc
@@ -1362,7 +1390,7 @@ class RItable(object):
 if __name__ == '__main__':
     lib_fname = 'jeff-3.2-wims69e-new.h5'
     set_default_settings(batches=10, inactive=3,
-                         particles=100)
+                         particles=50)
     opts_list = []
 
     # Options for generating U238
