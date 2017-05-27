@@ -16,7 +16,6 @@ import re
 import subprocess
 from time import sleep
 
-RESONANCE_FISSION_USER = 2
 DEFAULT_BATCHES = 1000
 DEFAULT_INACTIVE = 100
 DEFAULT_PARTICLES = 100000
@@ -176,7 +175,7 @@ class MicroMgXsOptions(object):
         self._ri_particles = DEFAULT_RI_PARTICLES
         self._has_res = False
         self._has_resfis = False
-        self._ri_use_openmc = False
+        self._ri_use_openmc = True
         self._find_nearest_temp = False
         self._nu = None
 
