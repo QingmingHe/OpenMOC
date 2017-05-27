@@ -131,6 +131,7 @@ public:
   FP_PRECISION getChiByGroup(int group);
   FP_PRECISION getFissionMatrixByGroup(int origin, int destination);
   FP_PRECISION getDF(int neib, int azim, int group, int polar);
+  FP_PRECISION getCurrent(int neib, int azim, int group, int polar);
   int getDFIndex(int neib, int azim, int group, int polar);
   bool isFissionable();
   bool isDataAligned();

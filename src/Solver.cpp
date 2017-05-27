@@ -795,12 +795,10 @@ void Solver::computeFlux(int max_iters, solverMode mode,
   for (int i=0; i < max_iters; i++) {
 
     /* Set partial current to be zero */
-    if (_calc_df == 1) {
-      for (int r = 0; r < _num_FSRs; r++) {
-        if (_FSR_materials[r]->_n_df != 0) {
-          memset(_FSR_materials[r]->_current_ou, 0.0,
-                 sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
-        }
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->_n_df != 0) {
+        memset(_FSR_materials[r]->_current_ou, 0.0,
+               sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
       }
     }
 
@@ -975,12 +973,10 @@ void Solver::computeSource(int max_iters, solverMode mode,
   for (int i=0; i < max_iters; i++) {
 
     /* Set partial current to be zero */
-    if (_calc_df == 1) {
-      for (int r = 0; r < _num_FSRs; r++) {
-        if (_FSR_materials[r]->_n_df != 0) {
-          memset(_FSR_materials[r]->_current_ou, 0.0,
-                 sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
-        }
+    for (int r = 0; r < _num_FSRs; r++) {
+      if (_FSR_materials[r]->_n_df != 0) {
+        memset(_FSR_materials[r]->_current_ou, 0.0,
+               sizeof(FP_PRECISION) * _FSR_materials[r]->_n_df);
       }
     }
 

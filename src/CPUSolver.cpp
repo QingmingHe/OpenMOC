@@ -718,115 +718,55 @@ void CPUSolver::tallyScalarFlux(segment* curr_segment, int azim_index,
   /* Compute change in angular flux along segment in this FSR */
   if (_calc_df == 1) {
     /* Calculate discontinuity factors */
-    if (curr_segment->_material->_num_polar == 1) {
-      /* Case for azimuthal number == 1 and polar number == 1 */
-      for (int e=0; e < _num_groups; e++) {
-        for (int p=0; p < _num_polar_2; p++) {
+    for (int e=0; e < _num_groups; e++) {
+      for (int p=0; p < _num_polar_2; p++) {
 
-          exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
+        exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
 
-          flux_in = track_flux(p,e);
+        flux_in = track_flux(p,e);
 
-          flux_ou = flux_in * (1.0 - exponential) +
-            _reduced_sources(fsr_id,e) * exponential;
+        flux_ou = flux_in * (1.0 - exponential) +
+          _reduced_sources(fsr_id,e) * exponential;
 
-          next_mat = getNextMatIndex(next_segment, curr_segment);
+        next_mat = getNextMatIndex(next_segment, curr_segment);
 
-          if (next_mat != -1) {
-            df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, 0);
+        if (next_mat != -1) {
+          df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, p);
 
-            curr_segment->_material->_current_ou[df_index] +=
-              flux_ou * _quadrature->getWeightInline(azim_index, p);
+          curr_segment->_material->_current_ou[df_index] +=
+            flux_ou * _quadrature->getWeightInline(azim_index, p);
 
-            flux_ou *= curr_segment->_material->_df_ou[df_index];
-          }
-
-          delta_psi = flux_in - flux_ou;
-          track_flux(p,e) = flux_ou;
-          fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
+          flux_ou *= curr_segment->_material->_df_ou[df_index];
         }
-      }
-    }
-    else {
-      /* Case for azimuthal number == 1 and polar number != 1 */
-      for (int e=0; e < _num_groups; e++) {
-        for (int p=0; p < _num_polar_2; p++) {
 
-          exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
-
-          flux_in = track_flux(p,e);
-
-          flux_ou = flux_in * (1.0 - exponential) +
-            _reduced_sources(fsr_id,e) * exponential;
-
-          next_mat = getNextMatIndex(next_segment, curr_segment);
-
-          if (next_mat != -1) {
-            df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, p);
-
-            curr_segment->_material->_current_ou[df_index] +=
-              flux_ou * _quadrature->getWeightInline(azim_index, p);
-
-            flux_ou *= curr_segment->_material->_df_ou[df_index];
-          }
-
-          delta_psi = flux_in - flux_ou;
-          track_flux(p,e) = flux_ou;
-          fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
-        }
+        delta_psi = flux_in - flux_ou;
+        track_flux(p,e) = flux_ou;
+        fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
       }
     }
   }
   else if (_calc_df == 2) {
     /* Apply discontinuity factors */
-    if (curr_segment->_material->_num_polar == 1) {
-      /* Case for azimuthal number == 1 and polar number == 1 */
-      for (int e=0; e < _num_groups; e++) {
-        for (int p=0; p < _num_polar_2; p++) {
+    for (int e=0; e < _num_groups; e++) {
+      for (int p=0; p < _num_polar_2; p++) {
 
-          exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
+        exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
 
-          flux_in = track_flux(p,e);
+        flux_in = track_flux(p,e);
 
-          flux_ou = flux_in * (1.0 - exponential) +
-            _reduced_sources(fsr_id,e) * exponential;
+        flux_ou = flux_in * (1.0 - exponential) +
+          _reduced_sources(fsr_id,e) * exponential;
 
-          next_mat = getNextMatIndex(next_segment, curr_segment);
+        next_mat = getNextMatIndex(next_segment, curr_segment);
 
-          if (next_mat != -1) {
-            df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, 0);
-            flux_ou *= curr_segment->_material->_df_ou[df_index];
-          }
-
-          delta_psi = flux_in - flux_ou;
-          track_flux(p,e) = flux_ou;
-          fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
+        if (next_mat != -1) {
+          df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, p);
+          flux_ou *= curr_segment->_material->_df_ou[df_index];
         }
-      }
-    }
-    else {
-      /* Case for azimuthal number == 1 and polar number != 1 */
-      for (int e=0; e < _num_groups; e++) {
-        for (int p=0; p < _num_polar_2; p++) {
 
-          exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
-
-          flux_in = track_flux(p,e);
-
-          flux_ou = flux_in * (1.0 - exponential) +
-            _reduced_sources(fsr_id,e) * exponential;
-
-          next_mat = getNextMatIndex(next_segment, curr_segment);
-
-          if (next_mat != -1) {
-            df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, p);
-            flux_ou *= curr_segment->_material->_df_ou[df_index];
-          }
-
-          delta_psi = flux_in - flux_ou;
-          track_flux(p,e) = flux_ou;
-          fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
-        }
+        delta_psi = flux_in - flux_ou;
+        track_flux(p,e) = flux_ou;
+        fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
       }
     }
   }
@@ -835,7 +775,21 @@ void CPUSolver::tallyScalarFlux(segment* curr_segment, int azim_index,
     for (int e=0; e < _num_groups; e++) {
       for (int p=0; p < _num_polar_2; p++) {
         exponential = _exp_evaluator->computeExponential(sigma_t[e] * length, p);
-        delta_psi = (track_flux(p,e)-_reduced_sources(fsr_id,e)) * exponential;
+        flux_in = track_flux(p,e);
+        flux_ou = flux_in * (1.0 - exponential) +
+          _reduced_sources(fsr_id,e) * exponential;
+
+        /* Tally current */
+        next_mat = getNextMatIndex(next_segment, curr_segment);
+        if (next_mat != -1) {
+          df_index = curr_segment->_material->getDFIndex(next_mat, 0, e, p);
+          curr_segment->_material->_current_ou[df_index] +=
+            flux_ou * _quadrature->getWeightInline(azim_index, p);
+        }
+
+        /* delta_psi = (track_flux(p,e)-_reduced_sources(fsr_id,e)) */
+        /*   * exponential; */
+        delta_psi = flux_in - flux_ou;
         fsr_flux[e] += delta_psi * _quadrature->getWeightInline(azim_index, p);
         track_flux(p,e) -= delta_psi;
       }
@@ -850,6 +804,7 @@ void CPUSolver::tallyScalarFlux(segment* curr_segment, int azim_index,
   }
   omp_unset_lock(&_FSR_locks[fsr_id]);
 }
+
 
 int getNextMatIndex(segment* next_segment, segment* curr_segment) {
   int index = -1;

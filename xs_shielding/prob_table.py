@@ -5,6 +5,12 @@ from copy import deepcopy
 from math import sqrt
 
 _NO_RESONANCE = 0.998
+_default_background1 = None
+
+
+def set_default_background1(backgrounds1):
+    global _default_background1
+    _default_background1 = backgrounds1
 
 
 def comp_sub_level(ig, pt, mglib, resnuc_xs, nuclide, temps, ave_temp,
@@ -194,6 +200,7 @@ class ProbTable(object):
         self._n_xxx = 0
         self._xs_xxx = None
         self._check_xxx_idx = []
+        self._subx_method = 0
 
         # Parameters to be calculated
         self._xs_tot = None
@@ -205,6 +212,7 @@ class ProbTable(object):
         self._sub_nfi = None
         self._sub_wgt = None
         self._sub_xxx = None
+        self._sub_int = None
 
     def fit(self, n_band_begin=2, n_band_end=7):
         # Calculate total xs from absorb and scatter
@@ -228,22 +236,30 @@ class ProbTable(object):
         min_rms_n_band = 0
         for n_band in range(n_band_begin, n_band_end):
             # Get background cross sections for fit
-            idx0, idx1, idx2, backgrounds0, backgrounds1, backgrounds2 \
-                = _get_backgrounds(n_band, self._gc_factor, self._potential,
-                                   self._dilutions)
+            idx0, idx1, idx2, backgrounds0, backgrounds1, \
+                backgrounds2 = _get_backgrounds(
+                    n_band, self._gc_factor, self._potential,
+                    self._dilutions, self._subx_method)
 
             # Fit based on IR model
             sub_int[n_band], sub_wgt[n_band], sub_tot[n_band], \
                 sub_sca[n_band], sub_abs[n_band], sub_nfi[n_band], \
                 sub_xxx[n_band] \
                 = self._fit_ir(n_band, idx0, idx1, backgrounds0, backgrounds1)
+            # print n_band
+            # print 'sub_wgt'
+            # print sub_wgt[n_band]
+            # print 'sub_int'
+            # print sub_int[n_band]
+            # print 'sub_abs'
+            # print sub_abs[n_band]
 
             # Check stability of subgroup parameters
             stable = True
             if self._xs_xxx is None:
                 for ib in range(n_band):
                     if sub_tot[n_band][ib] <= 0.0 \
-                       or sub_sca[n_band][ib] > 1.0 * sub_tot[n_band][ib] \
+                       or sub_sca[n_band][ib] > sub_tot[n_band][ib] \
                        or sub_sca[n_band][ib] <= 0.0 \
                        or sub_wgt[n_band][ib] <= 0.0 \
                        or sub_wgt[n_band][ib] >= 1.0:
@@ -270,8 +286,9 @@ class ProbTable(object):
                 xs_abs2 = np.zeros(n_back2)
                 for i in range(n_back2):
                     xs_abs2[i] = self._xs_abs[idx2[i]]
-                rms = _calc_fit_error(xs_abs2, backgrounds2, sub_int[n_band],
-                                      sub_abs[n_band], sub_wgt[n_band])
+                rms, errs = calc_fit_error(
+                    xs_abs2, backgrounds2, sub_int[n_band],
+                    sub_abs[n_band], sub_wgt[n_band])
                 if rms < min_rms:
                     min_rms_n_band = n_band
 
@@ -283,6 +300,7 @@ class ProbTable(object):
             self._sub_sca = sub_sca[min_rms_n_band]
             self._sub_abs = sub_abs[min_rms_n_band]
             self._sub_wgt = sub_wgt[min_rms_n_band]
+            self._sub_int = sub_int[min_rms_n_band]
             if self._xs_nfi is not None:
                 self._sub_nfi = sub_nfi[min_rms_n_band]
             if self._xs_xxx is not None:
@@ -336,27 +354,32 @@ class ProbTable(object):
         sub_int, sub_wgt = _calc_sub_int_wgt(c, d)
 
         # Calculate subgroup total xs
-        sub_tot = _calc_sub_x(xs_tot1, xs_tot_inf, sub_int, d, backgrounds1)
+        sub_tot = _calc_sub_x(xs_tot1, xs_tot_inf, sub_int, d,
+                              backgrounds1, self._subx_method)
 
         # Calculate subgroup scatter xs
-        sub_sca = _calc_sub_x(xs_sca1, xs_sca_inf, sub_int, d, backgrounds1)
+        sub_sca = _calc_sub_x(xs_sca1, xs_sca_inf, sub_int, d,
+                              backgrounds1, self._subx_method)
 
         # Calculate subgroup absorption xs
-        sub_abs = _calc_sub_x(xs_abs1, xs_abs_inf, sub_int, d, backgrounds1)
+        sub_abs = _calc_sub_x(xs_abs1, xs_abs_inf, sub_int, d,
+                              backgrounds1, self._subx_method)
 
         # Calculate subgroup nu fission xs
         sub_nfi = None
         if self._xs_nfi is not None:
             sub_nfi = _calc_sub_x(xs_nfi1, xs_nfi_inf, sub_int, d,
-                                  backgrounds1)
+                                  backgrounds1, self._subx_method)
 
         # Calculate subgroup xs of xxx type
         sub_xxx = None
         if self._xs_xxx is not None:
             sub_xxx = np.zeros((self._n_xxx, n_band))
             for i in range(self._n_xxx):
-                sub_xxx[i, :] = _calc_sub_x(xs_xxx1[i, :], xs_xxx_inf[i],
-                                            sub_int, d, backgrounds1)
+                sub_xxx[i, :] = _calc_sub_x(xs_xxx1[i, :],
+                                            xs_xxx_inf[i],
+                                            sub_int, d, backgrounds1,
+                                            self._subx_method)
 
         return sub_int, sub_wgt, sub_tot, sub_sca, sub_abs, sub_nfi, sub_xxx
 
@@ -409,6 +432,14 @@ class ProbTable(object):
         self._xs_nfi = xs_nfi
 
     @property
+    def subx_method(self):
+        return self._subx_method
+
+    @subx_method.setter
+    def subx_method(self, subx_method):
+        self._subx_method = subx_method
+
+    @property
     def check_xxx_idx(self):
         return self._check_xxx_idx
 
@@ -454,6 +485,10 @@ class ProbTable(object):
         return self._sub_wgt
 
     @property
+    def sub_int(self):
+        return self._sub_int
+
+    @property
     def has_prob_table(self):
         return self._has_prob_table
 
@@ -472,33 +507,56 @@ def _find_nearest_array(array0, array1):
     return idx, array2
 
 
-def _get_backgrounds(n_band, gc_factor, potential, dilutions):
+def _get_backgrounds(n_band, gc_factor, potential, dilutions,
+                     subx_method):
+    global _default_background1
     # Calculate lambda * potential
     n_back = len(dilutions)
     lp = gc_factor * potential
 
     # Get backgrounds to calculate intermediate subgroup xs and wgt
     if n_band == 2:
-        backgrounds0 = [10.0, 52.0]
+        backgrounds0 = [1e1, 52.0]
     elif n_band == 3:
-        backgrounds0 = [1e1, 28.0, 52.0, 200.0]
+        backgrounds0 = [1e1, 52.0, 1e2, 1e3]
     elif n_band == 4:
-        backgrounds0 = [1e1, 28.0, 52.0, 2e2, 1200.0, 1e4]
+        backgrounds0 = [1e1, 28.0, 52.0, 1e2, 1e3, 1e4]
     elif n_band == 5:
-        backgrounds0 = [1e1, 28.0, 52.0, 1e2, 2e2, 6e2, 1e3, 1e4]
+        backgrounds0 = [1e1, 28.0, 45.0, 52.0, 1e2, 2e2, 1e3, 1e4]
     elif n_band == 6:
-        backgrounds0 = [1e1, 28.0, 40.0, 52.0, 1e2, 2e2, 6e2, 1e3, 1200.0, 1e4]
+        backgrounds0 = [1e1, 28.0, 40.0, 45.0, 52.0, 1e2, 2e2, 6e2,
+                        1e3, 1e4]
     elif n_band == 7:
-        backgrounds0 = [1e1, 28.0, 40.0, 45.0, 52.0, 80.0, 1e2, 2e2, 6e2, 1e3,
-                        1200.0, 1e4]
+        backgrounds0 = [1e1, 28.0, 40.0, 45.0, 52.0, 80.0, 1e2, 2e2,
+                        6e2, 8e2, 1e3, 1e4]
     else:
-        raise Exception('n_band should be smaller than 6')
+        raise Exception('n_band should be smaller than 7')
     idx0, backgrounds0 = _find_nearest_array(dilutions, backgrounds0)
     backgrounds0 += lp
 
     # Get backgrounds to fit partial subgroup xs
-    backgrounds1 = [5.0, 1e1, 15.0, 20.0, 25.0, 28.0, 30.0, 35.0, 40.0, 45.0,
-                    50.0, 52.0, 60.0, 70.0, 80.0, 1e2, 2e2, 4e2, 6e2, 1e3]
+    if _default_background1 is not None:
+        backgrounds1 = _default_background1
+    else:
+        if subx_method == 0:
+            backgrounds1 = [5.0, 1e1, 15.0, 20.0, 25.0, 28.0, 30.0,
+                            35.0, 40.0, 45.0, 50.0, 52.0, 60.0, 70.0,
+                            80.0, 1e2, 2e2, 4e2, 6e2, 1e3]
+        elif subx_method == 1:
+            if n_band == 2:
+                backgrounds1 = [1e1]
+            elif n_band == 3:
+                backgrounds1 = [1e1, 1e2]
+            elif n_band == 4:
+                backgrounds1 = [1e1, 1e2, 1e3]
+            elif n_band == 5:
+                backgrounds1 = [1e1, 52.0, 1e2, 1e3]
+            elif n_band == 6:
+                backgrounds1 = [1e1, 52.0, 1e2, 2e2, 1e3]
+            elif n_band == 7:
+                backgrounds1 = [1e1, 52.0, 1e2, 2e2, 4e2, 1e3]
+            else:
+                raise Exception('n_band should be smaller than 7')
     idx1, backgrounds1 = _find_nearest_array(dilutions, backgrounds1)
     backgrounds1 += lp
 
@@ -562,9 +620,9 @@ def _calc_sub_int_wgt(c, d):
     return sub_int, sub_wgt
 
 
-def _calc_sub_x(xs_x1, xs_x_inf, sub_int, d, backgrounds1):
-    n_band = len(d)
+def _calc_e_coeff_fit(xs_x1, xs_x_inf, sub_int, d, backgrounds1):
     n_back = len(backgrounds1)
+    n_band = len(d)
 
     A = np.zeros((n_band-1, n_band-1))
     for i in range(n_band-1):
@@ -581,12 +639,43 @@ def _calc_sub_x(xs_x1, xs_x_inf, sub_int, d, backgrounds1):
             G = G * xs_x1[k] - xs_x_inf * backgrounds1[k] ** (n_band-1)
             b[i] += G * backgrounds1[k] ** i
 
-    e_bar = np.linalg.solve(A, b)
+    e = np.zeros(n_band)
+    e[0] = xs_x_inf
+    e[1:] = np.linalg.solve(A, b)[::-1]
+
+    return e
+
+
+def _calc_e_coeff_nonfit(xs_x1, xs_x_inf, sub_int, d, backgrounds1):
+    n_band = len(d)
+
+    A = np.zeros((n_band-1, n_band-1))
+    for i in range(n_band-1):
+        for j in range(n_band-1):
+            A[i, j] = backgrounds1[i] ** j
+
+    b = np.zeros(n_band-1)
+    for i in range(n_band-1):
+        for j in range(n_band):
+            b[i] += d[j] * backgrounds1[i] ** (n_band - j - 1)
+        b[i] = b[i] * xs_x1[i] - xs_x_inf * backgrounds1[i] ** (n_band-1)
 
     e = np.zeros(n_band)
     e[0] = xs_x_inf
-    for i in range(1, n_band):
-        e[i] = e_bar[n_band-i-1]
+    e[1:] = np.linalg.solve(A, b)[::-1]
+
+    return e
+
+
+def _calc_sub_x(xs_x1, xs_x_inf, sub_int, d, backgrounds1, method):
+    n_band = len(d)
+
+    if method == 0:
+        e = _calc_e_coeff_fit(xs_x1, xs_x_inf, sub_int, d,
+                              backgrounds1)
+    elif method == 1:
+        e = _calc_e_coeff_nonfit(xs_x1, xs_x_inf, sub_int, d,
+                                 backgrounds1)
 
     sub_x = np.zeros(n_band)
     for i in range(n_band):
@@ -604,7 +693,7 @@ def _calc_sub_x(xs_x1, xs_x_inf, sub_int, d, backgrounds1):
     return sub_x
 
 
-def _calc_fit_error(xs_x2, backgrounds2, sub_int, sub_x, sub_wgt):
+def calc_fit_error(xs_x2, backgrounds2, sub_int, sub_x, sub_wgt):
     n_back = len(backgrounds2)
     rms = 0.0
     err = np.zeros(n_back)
@@ -618,7 +707,7 @@ def _calc_fit_error(xs_x2, backgrounds2, sub_int, sub_x, sub_wgt):
         rms += err[i] ** 2
     rms = sqrt(rms / n_back)
 
-    return rms
+    return rms, err
 
 
 def test_fit():

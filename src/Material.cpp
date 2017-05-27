@@ -941,9 +941,16 @@ FP_PRECISION Material::getDF(int neib, int azim, int group, int polar) {
 }
 
 
+FP_PRECISION Material::getCurrent(int neib, int azim, int group, int polar) {
+  return _current_ou[neib * _num_azim * _num_groups * _num_polar +
+                     azim * _num_groups * _num_polar + group * _num_polar +
+                     polar];
+}
+
+
 int Material::getDFIndex(int neib, int azim, int group, int polar) {
   return neib * _num_azim * _num_groups * _num_polar + azim * _num_groups *
-    _num_polar + group * _num_polar + polar;
+    _num_polar + group * _num_polar + std::min(polar, _num_polar-1);
 }
 
 

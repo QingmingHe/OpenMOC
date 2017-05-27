@@ -103,7 +103,7 @@
 /* The typemap used to match the method signature for the
  * PolarQuad::setWeights method. This allows users to set the polar angle
  * quadrature weights using a NumPy array */
-%apply (double* IN_ARRAY1, int DIM1) {(double* weights, int num_polar)}
+%apply (double* IN_ARRAY1, int DIM1) {(double* weights, int num_azim_times_polar)}
 
 /* The typemap used to match the method signature for Solver::getFluxes */
 %apply (FP_PRECISION* ARGOUT_ARRAY1, int DIM1) {(FP_PRECISION* out_fluxes, int num_fluxes)}

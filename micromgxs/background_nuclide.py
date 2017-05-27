@@ -7,6 +7,7 @@ from math import log10
 import xml.etree.ElementTree as et
 import xml.dom.minidom as minidom
 from potentials import average_potentials
+from openmoc.library_ce import is_disappearance
 
 
 def _copy_attrs(from_grp, to_grp):

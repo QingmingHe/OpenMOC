@@ -22,6 +22,8 @@ class LibraryPseudo(object):
         self._n_dilution = len(self._dilutions)
         self._temps = None
         self._find_nearest_temp = False
+        self._max_n_band = 6
+        self._subx_method = 0
 
         self._n_nuclide = 0
         self._has_res_fis = False
@@ -67,6 +69,22 @@ class LibraryPseudo(object):
     @temperature.setter
     def temperature(self, temperature):
         self._temperature = temperature
+
+    @property
+    def subx_method(self):
+        return self._subx_method
+
+    @subx_method.setter
+    def subx_method(self, subx_method):
+        self._subx_method = subx_method
+
+    @property
+    def max_n_band(self):
+        return self._max_n_band
+
+    @max_n_band.setter
+    def max_n_band(self, max_n_band):
+        self._max_n_band = max_n_band
 
     @property
     def cross_sections(self):
@@ -328,6 +346,7 @@ class LibraryPseudo(object):
         if self._temps is None:
             # Fit subgroup parameters
             pt = ProbTable()
+            pt.subx_method = self._subx_method
             pt.gc_factor = self._gc_factor[jg]
             pt.potential = self._potential[jg]
             pt.dilutions = self._dilutions
@@ -335,11 +354,12 @@ class LibraryPseudo(object):
             pt.xs_sca = self._res_sca[jg, inuc, :]
             if self._has_res_fis:
                 pt.xs_nfi = self._res_nfi[jg, inuc, :]
-            pt.fit()
+            pt.fit(n_band_end=self._max_n_band+1)
 
             return {'lambda': pt.gc_factor, 'potential': pt.potential,
                     'sub_tot': pt.sub_tot, 'sub_abs': pt.sub_abs, 'sub_sca':
                     pt.sub_sca, 'sub_nfi': pt.sub_nfi, 'sub_wgt': pt.sub_wgt,
+                    'sub_int': pt.sub_int,
                     'n_band': pt.n_band}
 
         else:
@@ -369,7 +389,7 @@ class LibraryPseudo(object):
                 i += n_xxx
             pt.xs_xxx = xs_xxx
             pt.check_xxx_idx = check_xxx_idx
-            pt.fit()
+            pt.fit(n_band_end=self._max_n_band+1)
 
             pt_ave = {}
             pt_ave['lambda'] = pt.gc_factor
@@ -379,6 +399,7 @@ class LibraryPseudo(object):
             pt_ave['sub_sca'] = pt.sub_sca
             pt_ave['sub_nfi'] = pt.sub_nfi
             pt_ave['sub_wgt'] = pt.sub_wgt
+            pt_ave['sub_int'] = pt.sub_int
             pt_ave['n_band'] = pt.n_band
             pts = []
             i = 0
@@ -400,7 +421,7 @@ class LibraryPseudo(object):
 
 if __name__ == '__main__':
     fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs/',
+                         'Dropbox/work/codes/openmoc/micromgxs/',
                          'jeff-3.2-wims69e.h5')
     mglib = LibraryMicro()
     mglib.load_from_h5(fname)

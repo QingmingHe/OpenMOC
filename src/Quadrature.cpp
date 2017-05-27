@@ -760,6 +760,7 @@ void Quadrature::precomputeWeights(bool solve_3D) {
       setPolarValues(_total_weights, a, p, weight);
       /* std::cout << a << " " */
       /*           << p << " " */
+      /*           << M_PI << " " */
       /*           << _azim_weights[a] << " " */
       /*           << _azim_spacings[a] << " " */
       /*           << _polar_weights[a][p] << " " */

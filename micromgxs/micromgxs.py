@@ -15,10 +15,7 @@ from math import pi
 import re
 import subprocess
 from time import sleep
-from openmoc import SDSolver
-from openmoc.library_ce import LibraryCe
 
-RESONANCE_FISSION_AUTO = 1
 RESONANCE_FISSION_USER = 2
 DEFAULT_BATCHES = 10
 DEFAULT_INACTIVE = 5
@@ -116,15 +113,6 @@ def _get_potential_from_endf(fname):
                     return 4.0 * pi * a ** 2
 
 
-def _has_resfis(A, Z):
-    has_resfis = False
-    if Z == 92 and (A == 233 or A == 235):
-        has_resfis = True
-    elif Z == 94 and (A == 239 or A == 241):
-        has_resfis = True
-    return has_resfis
-
-
 def _get_A_Z_awr(cross_sections, materials):
     tree = ET.parse(cross_sections)
     root = tree.getroot()
@@ -176,10 +164,9 @@ class MicroMgXsOptions(object):
         self._batches = DEFAULT_BATCHES
         self._inactive = DEFAULT_INACTIVE
         self._particles = DEFAULT_PARTICLES
-        self._resfis_method = RESONANCE_FISSION_AUTO
         self._has_res = False
         self._has_resfis = False
-        self._ri_use_openmc = True
+        self._ri_use_openmc = False
         self._find_nearest_temp = False
         self._nu = None
 
@@ -286,14 +273,6 @@ class MicroMgXsOptions(object):
     @particles.setter
     def particles(self, particles):
         self._particles = particles
-
-    @property
-    def resfis_method(self):
-        return self._resfis_method
-
-    @resfis_method.setter
-    def resfis_method(self, resfis_method):
-        self._resfis_method = resfis_method
 
     @property
     def has_res(self):
@@ -1145,7 +1124,6 @@ class RItable(object):
         self._background_nuclide = opts.background_nuclide
         self._batches = opts.batches
         self._particles = opts.particles
-        self._resfis_method = opts.resfis_method
         self._has_res = opts.has_res
         self._has_resfis = opts.has_resfis
         self._ri_use_openmc = opts.ri_use_openmc
@@ -1213,6 +1191,8 @@ class RItable(object):
         tallies.export_to_xml()
 
     def _obtain_sd_xs(self, temperature, itemp):
+        from openmoc import SDSolver
+        from openmoc.library_ce import LibraryCe
         global _cross_sections
 
         # Initialize slowing down solver
@@ -1282,10 +1262,6 @@ class RItable(object):
         # Don't build library if no resonance
         if not self._has_res:
             return
-
-        # Whether has resonance fission
-        if self._resfis_method == RESONANCE_FISSION_AUTO:
-            self._has_resfis = _has_resfis(self._A, self._Z)
 
         # Initialize multi-group cross sections (resonance xs table part)
         n_res = self._group_structure.n_res
@@ -1384,40 +1360,65 @@ class RItable(object):
         f.close()
 
 if __name__ == '__main__':
-    libname = 'wims79'
-    lib_fname = 'jeff-3.2-%s.h5' % libname
-    set_default_settings(batches=30, inactive=10, particles=1000)
-    group_structure = GroupStructure(libname)
+    lib_fname = 'jeff-3.2-wims69e-new.h5'
+    set_default_settings(batches=10, inactive=3,
+                         particles=100)
     opts_list = []
 
     # Options for generating U238
     opts_u238 = MicroMgXsOptions()
     opts_u238.nuclide = 'U238'
     opts_u238.has_res = True
-    opts_u238.reference_dilution = 45.0
-    # opts_u238.temperatures = [293.6]
-    # opts_u238.dilutions = [28.0]
-    opts_u238.ri_use_openmc = False
-    opts_u238.group_structure = group_structure
+    opts_u238.reference_dilution = 28.0
     opts_list.append(opts_u238)
 
-    # # Options for generating U235
-    # opts_u235 = MicroMgXsOptions()
-    # opts_u235.nuclide = 'U235'
-    # opts_u235.has_res = True
-    # opts_u235.reference_dilution = 800.0
-    # opts_list.append(opts_u235)
+    # Options for generating U235
+    opts_u235 = MicroMgXsOptions()
+    opts_u235.nuclide = 'U235'
+    opts_u235.has_res = True
+    opts_u235.has_resfis = True
+    opts_u235.reference_dilution = 800.0
+    opts_list.append(opts_u235)
+
+    # Options for generating Pu239
+    opts_pu239 = MicroMgXsOptions()
+    opts_pu239.nuclide = 'Pu239'
+    opts_pu239.has_res = True
+    opts_pu239.has_resfis = True
+    opts_pu239.reference_dilution = 700.0
+    opts_list.append(opts_pu239)
+
+    # Options for generating Pu240
+    opts_pu240 = MicroMgXsOptions()
+    opts_pu240.nuclide = 'Pu240'
+    opts_pu240.has_res = True
+    opts_pu240.reference_dilution = 2e3
+    opts_list.append(opts_pu240)
+
+    # Options for generating Pu241
+    opts_pu241 = MicroMgXsOptions()
+    opts_pu241.nuclide = 'Pu241'
+    opts_pu241.has_res = True
+    opts_pu241.has_resfis = True
+    opts_pu241.reference_dilution = 1e4
+    opts_list.append(opts_pu241)
+
+    # Options for generating Pu242
+    opts_pu242 = MicroMgXsOptions()
+    opts_pu242.nuclide = 'Pu242'
+    opts_pu242.has_res = True
+    opts_pu242.reference_dilution = 1e5
+    opts_list.append(opts_pu242)
 
     # Options for generating H1
     opts_h1 = MicroMgXsOptions()
     opts_h1.nuclide = 'H1'
-    opts_h1.group_structure = group_structure
     opts_list.append(opts_h1)
 
     # # Options for generating O16
-    # opts_o16 = MicroMgXsOptions()
-    # opts_o16.nuclide = 'O16'
-    # opts_list.append(opts_o16)
+    opts_o16 = MicroMgXsOptions()
+    opts_o16.nuclide = 'O16'
+    opts_list.append(opts_o16)
 
     lib = MicroMgXsLibrary(opts_list, lib_fname)
     lib.build_library_h5()
