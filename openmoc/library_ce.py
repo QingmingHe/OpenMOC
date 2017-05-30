@@ -11,22 +11,117 @@ from openmoc import (SDLibrary, SDLibrary_interpEnergy,
                      SDLibrary_interpEnergyTemperature)
 
 _K_BOLTZMANN = 8.6173324e-5
-_N_GAMMA = 102
-_N_DA = 117
-_N_P0 = 600
-_N_AC = 849
-_N_TA = 155
-_N_DT = 182
-_N_P3HE = 191
-_N_D3HE = 192
-_N_3HEA = 193
-_N_3P = 197
+
+_TOTAL_XS = 1
+_ELASTIC = 2
+_N_NONELASTIC = 3
+_N_LEVEL = 4
+_MISC = 5
+_N_2ND = 11
+_N_2N = 16
+_N_3N = 17
 _N_FISSION = 18
 _N_F = 19
 _N_NF = 20
 _N_2NF = 21
+_N_NA = 22
+_N_N3A = 23
+_N_2NA = 24
+_N_3NA = 25
+_N_NP = 28
+_N_N2A = 29
+_N_2N2A = 30
+_N_ND = 32
+_N_NT = 33
+_N_N3HE = 34
+_N_ND2A = 35
+_N_NT2A = 36
+_N_4N = 37
 _N_3NF = 38
-_ELASTIC = 2
+_N_2NP = 41
+_N_3NP = 42
+_N_N2P = 44
+_N_NPA = 45
+_N_N1 = 51
+_N_N40 = 90
+_N_NC = 91
+_N_DISAPPEAR = 101
+_N_GAMMA = 102
+_N_P = 103
+_N_D = 104
+_N_T = 105
+_N_3HE = 106
+_N_A = 107
+_N_2A = 108
+_N_3A = 109
+_N_2P = 111
+_N_PA = 112
+_N_T2A = 113
+_N_D2A = 114
+_N_PD = 115
+_N_PT = 116
+_N_DA = 117
+_N_5N = 152
+_N_6N = 153
+_N_2NT = 154
+_N_TA = 155
+_N_4NP = 156
+_N_3ND = 157
+_N_NDA = 158
+_N_2NPA = 159
+_N_7N = 160
+_N_8N = 161
+_N_5NP = 162
+_N_6NP = 163
+_N_7NP = 164
+_N_4NA = 165
+_N_5NA = 166
+_N_6NA = 167
+_N_7NA = 168
+_N_4ND = 169
+_N_5ND = 170
+_N_6ND = 171
+_N_3NT = 172
+_N_4NT = 173
+_N_5NT = 174
+_N_6NT = 175
+_N_2N3HE = 176
+_N_3N3HE = 177
+_N_4N3HE = 178
+_N_3N2P = 179
+_N_3N3A = 180
+_N_3NPA = 181
+_N_DT = 182
+_N_NPD = 183
+_N_NPT = 184
+_N_NDT = 185
+_N_NP3HE = 186
+_N_ND3HE = 187
+_N_NT3HE = 188
+_N_NTA = 189
+_N_2N2P = 190
+_N_P3HE = 191
+_N_D3HE = 192
+_N_3HEA = 193
+_N_4N2P = 194
+_N_4N2A = 195
+_N_4NPA = 196
+_N_3P = 197
+_N_N3P = 198
+_N_3N2PA = 199
+_N_5N2P = 200
+_N_P0 = 600
+_N_PC = 649
+_N_D0 = 650
+_N_DC = 699
+_N_T0 = 700
+_N_TC = 749
+_N_3HE0 = 750
+_N_3HEC = 799
+_N_A0 = 800
+_N_AC = 849
+_N_2N0 = 875
+_N_2NC = 891
 
 
 def _find_temp_interp_index(kT, kTs):
@@ -48,7 +143,7 @@ def is_disappearance(mt):
         return True
     elif mt >= _N_P0 and mt <= _N_AC:
         return True
-    elif mt in (_N_TA, _N_DT, _N_P3HE, _N_D3HE, _N_3P):
+    elif mt in (_N_TA, _N_DT, _N_P3HE, _N_D3HE, _N_3HEA, _N_3P):
         return True
     else:
         return False
@@ -210,8 +305,8 @@ class LibraryCe(object):
             ii = (np.abs(np.array(kTs) - kT)).argmin()
 
             # Only energy point interpolation
-            acelib = self.get_xs_by_kT_grp(f, nuclide, kT_grps[ii],
-                                           has_res_fis)
+            acelib = get_xs_by_kT_grp(f, nuclide, kT_grps[ii],
+                                      has_res_fis)
             hflib = SDLibrary_interpEnergy(acelib, emax, emin, n, has_res_fis)
             del acelib
         else:
@@ -219,10 +314,10 @@ class LibraryCe(object):
             i0, i1 = _find_temp_interp_index(kT, kTs)
 
             # Temperature interpolation and energy point interpolation
-            acelib0 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i0],
-                                            has_res_fis)
-            acelib1 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
-                                            has_res_fis)
+            acelib0 = get_xs_by_kT_grp(f, nuclide, kT_grps[i0],
+                                       has_res_fis)
+            acelib1 = get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
+                                       has_res_fis)
             hflib = SDLibrary_interpEnergyTemperature(
                 acelib0, acelib1, kTs[i0], kTs[i1], kT, emax, emin, n,
                 has_res_fis)
@@ -249,8 +344,8 @@ class LibraryCe(object):
             ii = (np.abs(np.array(kTs) - kT)).argmin()
 
             # Only energy point interpolation
-            acelib = self.get_xs_by_kT_grp(f, nuclide, kT_grps[ii], has_res_fis,
-                                           getsdlib=False)
+            acelib = get_xs_by_kT_grp(f, nuclide, kT_grps[ii], has_res_fis,
+                                      getsdlib=False)
             attrs = {'awr': acelib['awr'], 'potential': acelib['potential']}
             xs = _interp_erg(acelib, emax, emin, npft, has_res_fis)
         else:
@@ -258,10 +353,10 @@ class LibraryCe(object):
             i0, i1 = _find_temp_interp_index(kT, kTs)
 
             # Temperature interpolation and energy point interpolation
-            acelib0 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i0],
-                                            has_res_fis, getsdlib=False)
-            acelib1 = self.get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
-                                            has_res_fis, getsdlib=False)
+            acelib0 = get_xs_by_kT_grp(f, nuclide, kT_grps[i0],
+                                       has_res_fis, getsdlib=False)
+            acelib1 = get_xs_by_kT_grp(f, nuclide, kT_grps[i1],
+                                       has_res_fis, getsdlib=False)
             attrs = {'awr': acelib0['awr'], 'potential': acelib0['potential']}
             xs = _interp_erg_temp(acelib0, acelib1, kTs[i0], kTs[i1], emax,
                                   emin, npft, kT, has_res_fis)
@@ -289,43 +384,66 @@ class LibraryCe(object):
 
         return attrs
 
-    def get_xs_by_kT_grp(self, f, nuclide, kT_grp, has_res_fis, getsdlib=True):
-        # Energy points
-        energy = f[nuclide]['energy'][kT_grp].value
-        n_energy = len(energy)
 
-        # Accumulate cross sections
-        xs_tot = np.zeros(n_energy)
-        xs_sca = np.zeros(n_energy)
+def get_xs_by_kT_grp(f, nuclide, kT_grp, has_res_fis, getsdlib=True):
+    # Energy points
+    energy = f[nuclide]['energy'][kT_grp].value
+    n_energy = len(energy)
+
+    # Accumulate cross sections
+    xs_tot = np.zeros(n_energy)
+    xs_abs = np.zeros(n_energy)
+    if has_res_fis:
+        xs_fis = np.zeros(n_energy)
+    else:
+        xs_fis = None
+    mts = [int(reaction[9:12]) for reaction in f[nuclide]['reactions']]
+    for reaction in f[nuclide]['reactions']:
+        mt = int(reaction[9:12])
+        # Skip total inelastic level scattering, gas production cross sections
+        # (MT=200+), etc.
+        if mt == _N_LEVEL or mt == _N_NONELASTIC:
+            continue
+        if mt > _N_5N2P and mt < _N_P0:
+            continue
+
+        # Skip level cross sections if total is available
+        if mt >= _N_P0 and mt <= _N_PC and _N_P in mts:
+            continue
+        if mt >= _N_D0 and mt <= _N_DC and _N_D in mts:
+            continue
+        if mt >= _N_T0 and mt <= _N_TC and _N_T in mts:
+            continue
+        if mt >= _N_3HE0 and mt <= _N_3HEC and _N_3HE in mts:
+            continue
+        if mt >= _N_A0 and mt <= _N_AC and _N_A in mts:
+            continue
+        if mt >= _N_2N0 and mt <= _N_2NC and _N_2N in mts:
+            continue
+
+        xs = f[nuclide]['reactions'][reaction][kT_grp]['xs']
+        i = xs.attrs['threshold_idx'] - 1
+        n = xs.shape[0]
+        xs_tot[i:i+n] += xs.value
+        if is_disappearance(mt):
+            xs_abs[i:i+n] += xs.value
+        if _is_fission(mt):
+            xs_abs[i:i+n] += xs.value
+            if has_res_fis:
+                xs_fis[i:i+n] += xs.value
+    xs_sca = xs_tot - xs_abs
+
+    if getsdlib:
+        acelib = SDLibrary()
+        acelib.setPotential(average_potential(nuclide))
+        acelib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
+        acelib.setEnergy(energy)
+        acelib.setXsTotal(xs_tot)
+        acelib.setXsScatter(xs_sca)
         if has_res_fis:
-            xs_fis = np.zeros(n_energy)
-        else:
-            xs_fis = None
-        for reaction in f[nuclide]['reactions']:
-            mt = int(reaction[9:12])
-            xs = f[nuclide]['reactions'][reaction][kT_grp]['xs']
-            i = xs.attrs['threshold_idx'] - 1
-            n = xs.shape[0]
-            if is_disappearance(mt):
-                xs_tot[i:i+n] += xs.value
-            if mt == _ELASTIC:
-                xs_tot[i:i+n] = xs.value
-                xs_sca[i:i+n] = xs.value
-            if has_res_fis:
-                if _is_fission(mt):
-                    xs_fis[i:i+n] += xs.value
-
-        if getsdlib:
-            acelib = SDLibrary()
-            acelib.setPotential(average_potential(nuclide))
-            acelib.setAwr(f[nuclide].attrs['atomic_weight_ratio'])
-            acelib.setEnergy(energy)
-            acelib.setXsTotal(xs_tot)
-            acelib.setXsScatter(xs_sca)
-            if has_res_fis:
-                acelib.setXsFission(xs_fis)
-            return acelib
-        else:
-            return {'potential': average_potential(nuclide), 'awr':
-                    f[nuclide].attrs['atomic_weight_ratio'], 'energy': energy,
-                    'xs_tot': xs_tot, 'xs_sca': xs_sca, 'xs_fis': xs_fis}
+            acelib.setXsFission(xs_fis)
+        return acelib
+    else:
+        return {'potential': average_potential(nuclide), 'awr':
+                f[nuclide].attrs['atomic_weight_ratio'], 'energy': energy,
+                'xs_tot': xs_tot, 'xs_sca': xs_sca, 'xs_fis': xs_fis}

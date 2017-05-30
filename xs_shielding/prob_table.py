@@ -528,35 +528,35 @@ def _get_backgrounds(n_band, gc_factor, potential, dilutions,
                         1e3, 1e4]
     elif n_band == 7:
         backgrounds0 = [1e1, 28.0, 40.0, 45.0, 52.0, 80.0, 1e2, 2e2,
-                        6e2, 8e2, 1e3, 1e4]
+                        4e2, 6e2, 1e3, 1e4]
     else:
         raise Exception('n_band should be smaller than 7')
     idx0, backgrounds0 = _find_nearest_array(dilutions, backgrounds0)
     backgrounds0 += lp
 
     # Get backgrounds to fit partial subgroup xs
-    if _default_background1 is not None:
-        backgrounds1 = _default_background1
-    else:
-        if subx_method == 0:
-            backgrounds1 = [5.0, 1e1, 15.0, 20.0, 25.0, 28.0, 30.0,
+    if subx_method == 0:
+        if _default_background1 is not None:
+            backgrounds1 = _default_background1
+        else:
+            backgrounds1 = [1e1, 15.0, 20.0, 25.0, 28.0, 30.0,
                             35.0, 40.0, 45.0, 50.0, 52.0, 60.0, 70.0,
-                            80.0, 1e2, 2e2, 4e2, 6e2, 1e3]
-        elif subx_method == 1:
-            if n_band == 2:
-                backgrounds1 = [1e1]
-            elif n_band == 3:
-                backgrounds1 = [1e1, 1e2]
-            elif n_band == 4:
-                backgrounds1 = [1e1, 1e2, 1e3]
-            elif n_band == 5:
-                backgrounds1 = [1e1, 52.0, 1e2, 1e3]
-            elif n_band == 6:
-                backgrounds1 = [1e1, 52.0, 1e2, 2e2, 1e3]
-            elif n_band == 7:
-                backgrounds1 = [1e1, 52.0, 1e2, 2e2, 4e2, 1e3]
-            else:
-                raise Exception('n_band should be smaller than 7')
+                            80.0, 90.0, 1e2, 2e2, 4e2, 6e2, 1e3]
+    elif subx_method == 1:
+        if n_band == 2:
+            backgrounds1 = [1e1]
+        elif n_band == 3:
+            backgrounds1 = [1e1, 1e2]
+        elif n_band == 4:
+            backgrounds1 = [1e1, 1e2, 1e3]
+        elif n_band == 5:
+            backgrounds1 = [1e1, 52.0, 1e2, 1e3]
+        elif n_band == 6:
+            backgrounds1 = [1e1, 52.0, 1e2, 2e2, 1e3]
+        elif n_band == 7:
+            backgrounds1 = [1e1, 52.0, 1e2, 2e2, 4e2, 1e3]
+        else:
+            raise Exception('n_band should be smaller than 7')
     idx1, backgrounds1 = _find_nearest_array(dilutions, backgrounds1)
     backgrounds1 += lp
 

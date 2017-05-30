@@ -16,9 +16,9 @@ class LibraryPseudo(object):
         self._temperature = None
         self._cross_sections = None
         self._mglib = None
-        self._dilutions = [5.0, 1e1, 15.0, 20.0, 25.0, 28.0, 30.0, 35.0, 40.0,
-                           45.0, 50.0, 52.0, 60.0, 70.0, 80.0, 1e2, 2e2, 4e2,
-                           6e2, 1e3, 1.2e3, 1e4, 1e10]
+        self._dilutions = [1e1, 15.0, 20.0, 25.0, 28.0, 30.0, 35.0, 40.0,
+                           45.0, 50.0, 52.0, 60.0, 70.0, 80.0, 90.0, 1e2, 2e2,
+                           4e2, 6e2, 8e2, 1e3, 1.2e3, 1e4, 1e10]
         self._n_dilution = len(self._dilutions)
         self._temps = None
         self._find_nearest_temp = False

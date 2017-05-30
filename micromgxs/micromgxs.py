@@ -40,11 +40,13 @@ def _wait_finished(jobid):
         sleep(5)
         out = _execute_command('squeue')
         jobids = []
-        for aline in out.split(b'\n')[1:]:
-            if len(aline) > 0:
-                jobids.append(aline.strip().split()[0])
-        if jobid not in jobids:
-            break
+        lines = out.strip().split(b'\n')[1:]
+        if len(lines) > 0:
+            for aline in lines:
+                if len(aline) > 0:
+                    jobids.append(aline.strip().split()[0])
+            if jobid not in jobids:
+                break
 
 
 def _run_openmc():
@@ -161,9 +163,9 @@ class MicroMgXsOptions(object):
         self._reference_dilution = 1e10
         self._fission_nuclide = 'U235'
         self._fisnuc_refdil = 800.0
-        self._dilutions = [5.0, 1e1, 15.0, 20.0, 25.0, 28.0, 30.0, 35.0, 40.0,
-                           45.0, 50.0, 52.0, 60.0, 70.0, 80.0, 1e2, 2e2, 4e2,
-                           6e2, 1e3, 1.2e3, 1e4, 1e10]
+        self._dilutions = [1e1, 15.0, 20.0, 25.0, 28.0, 30.0, 35.0, 40.0,
+                           45.0, 50.0, 52.0, 60.0, 70.0, 80.0, 90.0, 1e2, 2e2,
+                           4e2, 6e2, 8e2, 1e3, 1.2e3, 1e4, 1e10]
         self._temperatures = [293.6, 600.0, 900.0, 1200.0, 1500.0, 1800.0]
         self._group_structure = GroupStructure('wims69e')
         self._slowdown_nuclide = 'H1'
@@ -178,6 +180,15 @@ class MicroMgXsOptions(object):
         self._ri_use_openmc = True
         self._find_nearest_temp = False
         self._nu = None
+        self._process_chi = True
+
+    @property
+    def process_chi(self):
+        return self._process_chi
+
+    @process_chi.setter
+    def process_chi(self, process_chi):
+        self._process_chi = process_chi
 
     @property
     def nuclide(self):
@@ -859,6 +870,7 @@ class FullXs(object):
         self._batches = opts.batches
         self._particles = opts.particles
         self._inactive = opts.inactive
+        self._process_chi = opts.process_chi
 
     def _export_fs_xml(self, temperature):
         # Export geometry and materials of homogeneous problem
@@ -997,7 +1009,7 @@ class FullXs(object):
                 os.getcwd(), "statepoint.%s.*" % (self._batches)))[0]
             self._load_fix_statepoint(statepoint, itemp)
 
-        if self._fissionable:
+        if self._fissionable and self._process_chi:
             print('processing %s/full_xs/chi ...' % (self._nuclide))
             # Process chi for fissionable nuclide
             # Export eigenvalue input files
@@ -1384,65 +1396,85 @@ class RItable(object):
 
         f.close()
 
-if __name__ == '__main__':
-    lib_fname = 'jeff-3.2-wims69e-new.h5'
-    # set_default_settings(batches=10, inactive=3, particles=50)
+
+def main():
+    lib_fname = 'jeff-3.2-wims69e-1m.h5'
+    set_default_settings(batches=1000, inactive=100, particles=1000,
+                         ri_batches=1000, ri_particles=1000)
     opts_list = []
 
-    # Options for generating U238
-    opts_u238 = MicroMgXsOptions()
-    opts_u238.nuclide = 'U238'
-    opts_u238.has_res = True
-    opts_u238.reference_dilution = 28.0
-    opts_list.append(opts_u238)
+    # # Options for generating U238
+    # opts_u238 = MicroMgXsOptions()
+    # opts_u238.nuclide = 'U238'
+    # opts_u238.has_res = True
+    # opts_u238.reference_dilution = 28.0
+    # opts_list.append(opts_u238)
 
-    # Options for generating U235
-    opts_u235 = MicroMgXsOptions()
-    opts_u235.nuclide = 'U235'
-    opts_u235.has_res = True
-    opts_u235.has_resfis = True
-    opts_u235.reference_dilution = 800.0
-    opts_list.append(opts_u235)
+    # # Options for generating U235
+    # opts_u235 = MicroMgXsOptions()
+    # opts_u235.nuclide = 'U235'
+    # opts_u235.has_res = True
+    # opts_u235.has_resfis = True
+    # opts_u235.reference_dilution = 800.0
+    # opts_list.append(opts_u235)
 
-    # Options for generating Pu239
-    opts_pu239 = MicroMgXsOptions()
-    opts_pu239.nuclide = 'Pu239'
-    opts_pu239.has_res = True
-    opts_pu239.has_resfis = True
-    opts_pu239.reference_dilution = 700.0
-    opts_list.append(opts_pu239)
+    # # Options for generating Pu239
+    # opts_pu239 = MicroMgXsOptions()
+    # opts_pu239.nuclide = 'Pu239'
+    # opts_pu239.has_res = True
+    # opts_pu239.has_resfis = True
+    # opts_pu239.reference_dilution = 700.0
+    # opts_list.append(opts_pu239)
 
-    # Options for generating Pu240
-    opts_pu240 = MicroMgXsOptions()
-    opts_pu240.nuclide = 'Pu240'
-    opts_pu240.has_res = True
-    opts_pu240.reference_dilution = 2e3
-    opts_list.append(opts_pu240)
+    # # Options for generating Pu240
+    # opts_pu240 = MicroMgXsOptions()
+    # opts_pu240.nuclide = 'Pu240'
+    # opts_pu240.has_res = True
+    # opts_pu240.reference_dilution = 2e3
+    # opts_list.append(opts_pu240)
 
     # Options for generating Pu241
     opts_pu241 = MicroMgXsOptions()
     opts_pu241.nuclide = 'Pu241'
-    opts_pu241.has_res = True
-    opts_pu241.has_resfis = True
+    opts_pu241.has_res = False
+    opts_pu241.has_resfis = False
     opts_pu241.reference_dilution = 1e4
+    opts_pu241.temperatures = [293.6]
+    opts_pu241.process_chi = False
     opts_list.append(opts_pu241)
 
-    # Options for generating Pu242
-    opts_pu242 = MicroMgXsOptions()
-    opts_pu242.nuclide = 'Pu242'
-    opts_pu242.has_res = True
-    opts_pu242.reference_dilution = 1e5
-    opts_list.append(opts_pu242)
+    # # Options for generating Pu242
+    # opts_pu242 = MicroMgXsOptions()
+    # opts_pu242.nuclide = 'Pu242'
+    # opts_pu242.has_res = True
+    # opts_pu242.reference_dilution = 1e5
+    # opts_list.append(opts_pu242)
 
-    # Options for generating H1
-    opts_h1 = MicroMgXsOptions()
-    opts_h1.nuclide = 'H1'
-    opts_list.append(opts_h1)
+    # # Options for generating H1
+    # opts_h1 = MicroMgXsOptions()
+    # opts_h1.nuclide = 'H1'
+    # opts_list.append(opts_h1)
 
-    # # Options for generating O16
-    opts_o16 = MicroMgXsOptions()
-    opts_o16.nuclide = 'O16'
-    opts_list.append(opts_o16)
+    # # # Options for generating O16
+    # opts_o16 = MicroMgXsOptions()
+    # opts_o16.nuclide = 'O16'
+    # opts_list.append(opts_o16)
 
     lib = MicroMgXsLibrary(opts_list, lib_fname)
     lib.build_library_h5()
+
+
+def check_pu241():
+    sp = openmc.StatePoint('statepoint.100.h5')
+    rt = sp.get_tally(scores=['total']).mean[:, 0, 0][::-1]
+    ra = sp.get_tally(scores=['absorption']).mean[:, 0, 0][::-1]
+    fl = sp.get_tally(scores=['flux']).mean[:, 0, 0][::-1]
+    num_dens = 0.069335 / (1.0 + 488.328914526)
+    xst = rt / fl / num_dens
+    xsa = ra / fl / num_dens
+    for ig in range(12, 27):
+        print '%2i %.6f %.6f' % (ig+1, xst[ig], xsa[ig])
+
+if __name__ == '__main__':
+    main()
+    # check_pu241()

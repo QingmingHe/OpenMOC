@@ -455,9 +455,8 @@ class LibraryMicro(object):
 if __name__ == "__main__":
     import os
     fname = os.path.join(os.getenv('HOME'),
-                         'Dropbox/work/codes/openmc/openmc/micromgxs/',
-                         'jeff-3.2-wims69e.h5')
+                         'Dropbox/work/codes/openmoc/micromgxs/',
+                         'jeff-3.2-wims69e-new.h5')
     lib = LibraryMicro()
     lib.load_from_h5(fname)
-    print lib.has_res('U238')
-    print lib.last_res - lib.first_res
+    print lib.get_typical_xs('Pu241', 293.6, 26, 'absorb', 'total', 'scatter')

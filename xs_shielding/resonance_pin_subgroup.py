@@ -106,6 +106,8 @@ class ResonancePinSubgroup(object):
         self._pin_cell_ave = pin_cell_ave
         self._sph = False
         self._mod_sph = False
+        self._max_n_band = 6
+        self._subx_method = 0
 
         self._pseudo_lib = None
         self._pseudo_libs = None
@@ -1290,6 +1292,8 @@ class ResonancePinSubgroup(object):
         self._pseudo_lib.temps = temperatures
         self._pseudo_lib.cross_sections = self._cross_sections
         self._pseudo_lib.mglib = self._micro_lib
+        self._pseudo_lib.max_n_band = self._max_n_band
+        self._pseudo_lib.subx_method = self._subx_method
 
         # Make the library
         self._pseudo_lib.make()
@@ -1309,6 +1313,8 @@ class ResonancePinSubgroup(object):
             plib.temperature = temp
             plib.cross_sections = self._cross_sections
             plib.mglib = self._micro_lib
+            plib.max_n_band = self._max_n_band
+            plib.subx_method = self._subx_method
             plib.make()
             self._pseudo_libs.append(plib)
 
@@ -1323,6 +1329,8 @@ class ResonancePinSubgroup(object):
         self._pseudo_lib.temperature = temperature
         self._pseudo_lib.cross_sections = self._cross_sections
         self._pseudo_lib.mglib = self._micro_lib
+        self._pseudo_lib.max_n_band = self._max_n_band
+        self._pseudo_lib.subx_method = self._subx_method
 
         # Make the library
         self._pseudo_lib.make()
@@ -1504,6 +1512,22 @@ class ResonancePinSubgroup(object):
     @cross_sections.setter
     def cross_sections(self, cross_sections):
         self._cross_sections = cross_sections
+
+    @property
+    def max_n_band(self):
+        return self._max_n_band
+
+    @max_n_band.setter
+    def max_n_band(self, max_n_band):
+        self._max_n_band = max_n_band
+
+    @property
+    def subx_method(self):
+        return self._subx_method
+
+    @subx_method.setter
+    def subx_method(self, subx_method):
+        self._subx_method = subx_method
 
     @property
     def first_calc_g(self):
