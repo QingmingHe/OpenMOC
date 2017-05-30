@@ -41,12 +41,11 @@ def _wait_finished(jobid):
         out = _execute_command('squeue')
         jobids = []
         lines = out.strip().split(b'\n')[1:]
-        if len(lines) > 0:
-            for aline in lines:
-                if len(aline) > 0:
-                    jobids.append(aline.strip().split()[0])
-            if jobid not in jobids:
-                break
+        for aline in lines:
+            if len(aline) > 0:
+                jobids.append(aline.strip().split()[0])
+        if jobid not in jobids:
+            break
 
 
 def _run_openmc():
@@ -1403,12 +1402,13 @@ def main():
                          ri_batches=1000, ri_particles=1000)
     opts_list = []
 
-    # # Options for generating U238
-    # opts_u238 = MicroMgXsOptions()
-    # opts_u238.nuclide = 'U238'
-    # opts_u238.has_res = True
-    # opts_u238.reference_dilution = 28.0
-    # opts_list.append(opts_u238)
+    # Options for generating U238
+    opts_u238 = MicroMgXsOptions()
+    opts_u238.nuclide = 'U238'
+    opts_u238.has_res = True
+    opts_u238.reference_dilution = 28.0
+    opts_u238.temperatures = [293.6, 600.0]
+    opts_list.append(opts_u238)
 
     # # Options for generating U235
     # opts_u235 = MicroMgXsOptions()
@@ -1433,15 +1433,15 @@ def main():
     # opts_pu240.reference_dilution = 2e3
     # opts_list.append(opts_pu240)
 
-    # Options for generating Pu241
-    opts_pu241 = MicroMgXsOptions()
-    opts_pu241.nuclide = 'Pu241'
-    opts_pu241.has_res = False
-    opts_pu241.has_resfis = False
-    opts_pu241.reference_dilution = 1e4
-    opts_pu241.temperatures = [293.6]
-    opts_pu241.process_chi = False
-    opts_list.append(opts_pu241)
+    # # Options for generating Pu241
+    # opts_pu241 = MicroMgXsOptions()
+    # opts_pu241.nuclide = 'Pu241'
+    # opts_pu241.has_res = False
+    # opts_pu241.has_resfis = False
+    # opts_pu241.reference_dilution = 1e4
+    # opts_pu241.temperatures = [293.6]
+    # opts_pu241.process_chi = False
+    # opts_list.append(opts_pu241)
 
     # # Options for generating Pu242
     # opts_pu242 = MicroMgXsOptions()
@@ -1450,10 +1450,11 @@ def main():
     # opts_pu242.reference_dilution = 1e5
     # opts_list.append(opts_pu242)
 
-    # # Options for generating H1
-    # opts_h1 = MicroMgXsOptions()
-    # opts_h1.nuclide = 'H1'
-    # opts_list.append(opts_h1)
+    # Options for generating H1
+    opts_h1 = MicroMgXsOptions()
+    opts_h1.nuclide = 'H1'
+    opts_h1.temperatures = [293.6, 600.0]
+    opts_list.append(opts_h1)
 
     # # # Options for generating O16
     # opts_o16 = MicroMgXsOptions()
